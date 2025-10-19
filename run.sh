@@ -5,7 +5,7 @@
 # File Created: Sunday, 19th October 2025 7:30:31 pm
 # Author: Josh.5 (jsunnex@gmail.com)
 # -----
-# Last Modified: Sunday, 19th October 2025 7:30:43 pm
+# Last Modified: Sunday, 19th October 2025 8:03:47 pm
 # Modified By: Josh.5 (jsunnex@gmail.com)
 ###
 
@@ -18,7 +18,8 @@ set -euo pipefail
 TARGET_DISK=${TARGET_DISK:-/dev/nvme0n1}
 TOOLS_DIR=${TOOLS_DIR:-/home/deck/tools}
 REPAIR_SCRIPT=${REPAIR_SCRIPT:-${TOOLS_DIR}/repair_device.sh}
-PATCHED_SCRIPT=${PATCHED_SCRIPT:-${TOOLS_DIR}/repair_device.safe.sh}
+PATCHED_SCRIPT=${PATCHED_SCRIPT:-${TOOLS_DIR}/repair_device.patched.sh}
+WIPE_HOME=0
 
 # Sizes can be overridden via environment variables if desired.
 ESP_SIZE=${ESP_SIZE:-256M}
@@ -51,7 +52,60 @@ confirm() {
     [[ ${reply,,} == y ]]
 }
 
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [--wipe-home] [--help]
+
+Options:
+  --wipe-home   Re-image SteamOS user partitions by invoking the installer
+                with the 'home' target (wipes /home and /var data). Defaults
+                to preserving user data via the 'system' target.
+  -h, --help    Show this help text and exit.
+
+Environment variables:
+  TARGET_DISK      Target disk device (default: /dev/nvme0n1)
+  TOOLS_DIR        Directory containing repair_device.sh (default: /home/deck/tools)
+  REPAIR_SCRIPT    Path to the original repair script
+  PATCHED_SCRIPT   Path to write the patched repair script
+  ESP_SIZE, EFI_SIZE, ROOT_SIZE, VAR_SIZE  Partition sizing overrides
+EOF
+}
+
+parse_args() {
+    local positional=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --wipe-home)
+                WIPE_HOME=1
+                shift
+                ;;
+            -h|--help)
+                usage
+                exit 0
+                ;;
+            --)
+                shift
+                positional+=("$@")
+                break
+                ;;
+            -*)
+                error "Unknown option: $1"
+                ;;
+            *)
+                positional+=("$1")
+                shift
+                ;;
+        esac
+    done
+
+    if ((${#positional[@]} > 0)); then
+        error "Unexpected positional argument: ${positional[0]}"
+    fi
+}
+
 main() {
+    parse_args "$@"
+
     [[ $EUID -eq 0 ]] || error "Please run as root."
 
     require_cmd lsblk
@@ -155,6 +209,7 @@ main() {
     echo
 
     echo "Patching $REPAIR_SCRIPT -> $PATCHED_SCRIPT"
+    tmp_patch=$(mktemp)
     sed \
         -e "s#^DISK=.*#DISK=$TARGET_DISK#" \
         -e "s/^FS_ESP=.*/FS_ESP=$esp_num/" \
@@ -166,13 +221,47 @@ main() {
         -e "s/^FS_VAR_B=.*/FS_VAR_B=$var_b_num/" \
         -e "s/^FS_HOME=.*/FS_HOME=$home_num/" \
         -e '/^all)$/,/^  ;;$/d' \
-        "$REPAIR_SCRIPT" >"$PATCHED_SCRIPT"
+        "$REPAIR_SCRIPT" >"$tmp_patch"
+
+    required_assignments=(
+        "DISK=$TARGET_DISK"
+        "FS_ESP=$esp_num"
+        "FS_EFI_A=$efi_a_num"
+        "FS_EFI_B=$efi_b_num"
+        "FS_ROOT_A=$root_a_num"
+        "FS_ROOT_B=$root_b_num"
+        "FS_VAR_A=$var_a_num"
+        "FS_VAR_B=$var_b_num"
+        "FS_HOME=$home_num"
+    )
+
+    for assignment in "${required_assignments[@]}"; do
+        if ! grep -q "^${assignment}\$" "$tmp_patch"; then
+            rm -f "$tmp_patch"
+            error "Failed to patch repair script; expected '$assignment'."
+        fi
+    done
+
+    if grep -q '^all)$' "$tmp_patch"; then
+        rm -f "$tmp_patch"
+        error "Failed to strip destructive 'all' target from repair script."
+    fi
+
+    mv "$tmp_patch" "$PATCHED_SCRIPT"
 
     chmod +x "$PATCHED_SCRIPT"
 
     echo "Patched installer saved to $PATCHED_SCRIPT"
     echo
-    if ! confirm "About to launch the SteamOS repair (system target). Continue?"; then
+
+    local target_mode=system
+    local confirm_message="About to launch the SteamOS repair (system target). Continue?"
+    if ((WIPE_HOME)); then
+        target_mode=home
+        confirm_message="About to launch the SteamOS user data wipe (home target). Continue?"
+    fi
+
+    if ! confirm "$confirm_message"; then
         echo "SteamOS install skipped at user request."
         exit 0
     fi
@@ -180,7 +269,7 @@ main() {
     echo "Running SteamOS installer..."
     (
         cd "$TOOLS_DIR"
-        NOPROMPT=1 "$PATCHED_SCRIPT" system
+        NOPROMPT=1 "$PATCHED_SCRIPT" "$target_mode"
     )
 }
 
