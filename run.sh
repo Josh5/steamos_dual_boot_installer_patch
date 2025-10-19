@@ -5,7 +5,7 @@
 # File Created: Sunday, 19th October 2025 7:30:31 pm
 # Author: Josh.5 (jsunnex@gmail.com)
 # -----
-# Last Modified: Sunday, 19th October 2025 8:22:04 pm
+# Last Modified: Sunday, 19th October 2025 8:35:55 pm
 # Modified By: Josh.5 (jsunnex@gmail.com)
 ###
 
@@ -19,7 +19,6 @@ TARGET_DISK=${TARGET_DISK:-/dev/nvme0n1}
 TOOLS_DIR=${TOOLS_DIR:-/home/deck/tools}
 REPAIR_SCRIPT=${REPAIR_SCRIPT:-${TOOLS_DIR}/repair_device.sh}
 PATCHED_SCRIPT=${PATCHED_SCRIPT:-${TOOLS_DIR}/repair_device.patched.sh}
-WIPE_HOME=0
 
 # Sizes can be overridden via environment variables if desired.
 ESP_SIZE=${ESP_SIZE:-256M}
@@ -54,12 +53,9 @@ confirm() {
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [--wipe-home] [--help]
+Usage: $(basename "$0") [--help]
 
 Options:
-  --wipe-home   Re-image SteamOS user partitions by invoking the installer
-                with the 'home' target (wipes /home and /var data). Defaults
-                to preserving user data via the 'system' target.
   -h, --help    Show this help text and exit.
 
 Environment variables:
@@ -75,10 +71,6 @@ parse_args() {
     local positional=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
-        --wipe-home)
-            WIPE_HOME=1
-            shift
-            ;;
         -h | --help)
             usage
             exit 0
@@ -257,12 +249,8 @@ main() {
     echo "Patched installer saved to $PATCHED_SCRIPT"
     echo
 
-    local target_mode=system
-    local confirm_message="About to launch the SteamOS repair (system target). Continue?"
-    if ((WIPE_HOME)); then
-        target_mode=home
-        confirm_message="About to launch the SteamOS user data wipe (home target). Continue?"
-    fi
+    local target_mode=home
+    local confirm_message="About to launch the SteamOS install. Continue?"
 
     if ! confirm "$confirm_message"; then
         echo "SteamOS install skipped at user request."
