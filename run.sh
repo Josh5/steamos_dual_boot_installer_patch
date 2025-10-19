@@ -5,7 +5,7 @@
 # File Created: Sunday, 19th October 2025 7:30:31 pm
 # Author: Josh.5 (jsunnex@gmail.com)
 # -----
-# Last Modified: Sunday, 19th October 2025 8:09:11 pm
+# Last Modified: Sunday, 19th October 2025 8:22:04 pm
 # Modified By: Josh.5 (jsunnex@gmail.com)
 ###
 
@@ -75,26 +75,26 @@ parse_args() {
     local positional=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
-            --wipe-home)
-                WIPE_HOME=1
-                shift
-                ;;
-            -h|--help)
-                usage
-                exit 0
-                ;;
-            --)
-                shift
-                positional+=("$@")
-                break
-                ;;
-            -*)
-                error "Unknown option: $1"
-                ;;
-            *)
-                positional+=("$1")
-                shift
-                ;;
+        --wipe-home)
+            WIPE_HOME=1
+            shift
+            ;;
+        -h | --help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            positional+=("$@")
+            break
+            ;;
+        -*)
+            error "Unknown option: $1"
+            ;;
+        *)
+            positional+=("$1")
+            shift
+            ;;
         esac
     done
 
@@ -220,6 +220,8 @@ main() {
         -e "s/^FS_VAR_A=.*/FS_VAR_A=$var_a_num/" \
         -e "s/^FS_VAR_B=.*/FS_VAR_B=$var_b_num/" \
         -e "s/^FS_HOME=.*/FS_HOME=$home_num/" \
+        -e 's/^  prompt_reboot "SteamOS reinstall complete."$/  estat "SteamOS reinstall complete. Reboot manually when ready."/' \
+        -e 's/^  prompt_reboot "User partitions have been reformatted."$/  estat "User partitions have been reformatted. Reboot manually when ready."/' \
         -e '/^all)$/,/^  ;;$/d' \
         "$REPAIR_SCRIPT" >"$tmp_patch"
 
@@ -249,7 +251,7 @@ main() {
 
     mv "$tmp_patch" "$PATCHED_SCRIPT"
 
-    chmod a+rwx "$PATCHED_SCRIPT"
+    chmod 777 "$PATCHED_SCRIPT"
 
     echo "Patched installer saved to $PATCHED_SCRIPT"
     echo
