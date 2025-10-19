@@ -5,7 +5,7 @@
 # File Created: Sunday, 19th October 2025 7:30:31 pm
 # Author: Josh.5 (jsunnex@gmail.com)
 # -----
-# Last Modified: Sunday, 19th October 2025 8:03:47 pm
+# Last Modified: Sunday, 19th October 2025 8:09:11 pm
 # Modified By: Josh.5 (jsunnex@gmail.com)
 ###
 
@@ -249,7 +249,7 @@ main() {
 
     mv "$tmp_patch" "$PATCHED_SCRIPT"
 
-    chmod +x "$PATCHED_SCRIPT"
+    chmod a+rwx "$PATCHED_SCRIPT"
 
     echo "Patched installer saved to $PATCHED_SCRIPT"
     echo
