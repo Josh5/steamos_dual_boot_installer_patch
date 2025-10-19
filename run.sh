@@ -212,6 +212,7 @@ main() {
         -e "s/^FS_VAR_A=.*/FS_VAR_A=$var_a_num/" \
         -e "s/^FS_VAR_B=.*/FS_VAR_B=$var_b_num/" \
         -e "s/^FS_HOME=.*/FS_HOME=$home_num/" \
+        -e 's/^  estat "Finalizing install part $1"$/  sleep 5\n  estat "Finalizing install part $1"/' \
         -e 's/^  writeHome=1$/  writeHome=1\n  writeOS=1/' \
         -e 's/^  prompt_reboot "SteamOS reinstall complete."$/  estat "SteamOS reinstall complete. Reboot manually when ready."/' \
         -e 's/^  prompt_reboot "User partitions have been reformatted."$/  estat "User partitions have been reformatted. Reboot manually when ready."/' \
