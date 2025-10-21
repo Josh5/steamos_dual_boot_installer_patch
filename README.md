@@ -34,23 +34,22 @@ Valve’s recovery image assumes it owns the whole disk and wipes everything. Re
 
 ## Prerequisites (do these in Windows **before** recovery)
 
-1. **Disable BitLocker (C:)**
-   - Settings > “Manage BitLocker” > Turn off for C:
-   - Wait until decryption is complete, then reboot.
-2. **Disable Secure Boot**
-   - Reboot into BIOS (pressing **VOL+** during boot).
-   - Navigate to **Boot > Secure Boot** and disable it.
-   - Save and exit.
-3. **Shrink C: to create Unallocated space**
-
+1. **Disable device encryption**
+   - Go to **Settings > Privacy & Security > Device Encryption** and turn it **off** (wait for full decryption).
+2. **Resize the Windows partition**
    - Open **Disk Management** (`Win+X > Disk Management` or `diskmgmt.msc`).
-   - Right‑click **C:** > **Shrink Volume…** > choose the size to free.
-   - Ensure the result shows as **Unallocated** (do **not** format it).
-
-4. **Create SteamOS Recovery USB**
-   - Follow Valve’s instructions here:  
-     [SteamOS Recovery Instructions](https://help.steampowered.com/en/faqs/view/65B4-2AA3-5F37-4227)
-   - Write the recovery image to a USB drive.
+   - Right‑click the **C:** partition > **Shrink Volume…** and choose how much free space to create (values are entered in MB).
+   - Wait for the shrink to finish and confirm the new space shows as **Unallocated** (leave it unformatted).  
+     ⚠️ If C: is almost full the shrink can fail—free up space (uninstall games, etc.) before retrying.
+3. **Disable Fast Startup in Windows**
+   - Go to **Control Panel > Power Options > Choose what the power buttons do**.
+   - Click **“Change settings that are currently unavailable”** (if shown) and uncheck **“Turn on fast startup (recommended)”**.
+4. **Disable Secure Boot in BIOS**
+   - Reboot, enter BIOS (hold your device’s BIOS key, e.g. **VOL+** on Ally/Deck‑like devices), and disable **Secure Boot**.
+5. **Disable Fast Boot in BIOS**
+   - In the same BIOS session, locate the **Fast Boot** setting and turn it **off**. Save and exit.
+6. **Create a SteamOS recovery USB**
+   - Follow Valve’s instructions: [SteamOS Recovery Instructions](https://help.steampowered.com/en/faqs/view/65B4-2AA3-5F37-4227) and write the image to a USB drive.
 
 ---
 
