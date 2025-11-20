@@ -65,6 +65,12 @@ Valve’s recovery image assumes it owns the whole disk and wipes everything. Re
    sudo ./run.sh
    ```
 
+   or if you want to run it in a single line:
+
+   ```bash
+   wget -O /tmp/run.sh https://raw.githubusercontent.com/Josh5/steamos_dual_boot_installer_patch/refs/heads/master/run.sh && sudo bash /tmp/run.sh
+   ```
+
 4. The script will show the **highest existing partition** and ask for the starting number for new SteamOS partitions (default is correct in most cases). Confirm to proceed.
 5. When prompted, it will patch the installer and start the SteamOS install targeting the new partitions.
 6. Reboot when done. Use your boot menu/manager to select SteamOS or Windows.
@@ -77,6 +83,7 @@ I have recorded a quick run through of this script on my ROG Ally X. You can wat
 
 [![Watch the demo](https://img.youtube.com/vi/sVW2MKR5cNk/0.jpg)](https://www.youtube.com/watch?v=sVW2MKR5cNk)
 
+(https://www.youtube.com/watch?v=sVW2MKR5cNk)
 
 ---
 
