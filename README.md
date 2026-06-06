@@ -50,6 +50,23 @@ Valve’s recovery image assumes it owns the whole disk and wipes everything. Re
    - In the same BIOS session, locate the **Fast Boot** setting and turn it **off**. Save and exit.
 6. **Create a SteamOS recovery USB**
    - Follow Valve’s instructions: [SteamOS Recovery Instructions](https://help.steampowered.com/en/faqs/view/65B4-2AA3-5F37-4227) and write the image to a USB drive.
+7. **Configure Windows to use UTC for the hardware clock**
+   - There is an annoying dual-boot issue where the two OS treat the system real-time clock differently.
+   - Linux usually assumes the hardware RTC is stored as **UTC**.
+   - Windows usually assumes the hardware RTC is stored as **local time**.
+   - When that mismatch leaves Linux with the wrong time after boot, the **SteamOS setup can fail HTTPS/TLS certificate validation** because TLS depends on accurate system time (you can be connected to Wi-Fi just fine, but SteamOS setup may still say there was a problem with the connection because the real failure is TLS, not basic network connectivity).
+   - Recommended reference: [Arch Wiki: UTC in Microsoft Windows](https://wiki.archlinux.org/title/System_time?utm_source=chatgpt.com#UTC_in_Microsoft_Windows)
+   - The Arch Wiki recommendation is to configure **Windows to use UTC**, rather than configuring Linux to use local time.
+   - Open `regedit` and add a `DWORD` named `RealTimeIsUniversal` with hexadecimal value `1` under:
+     `HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Control\TimeZoneInformation`
+   - Or run this from an **Administrator Command Prompt**:
+
+   ```bat
+   reg add "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\TimeZoneInformation" /v RealTimeIsUniversal /d 1 /t REG_DWORD /f
+   ```
+
+   - After applying the change, verify the **BIOS/system clock** is correct before starting SteamOS recovery.
+   - If the time is still offset, you may need to resync the clocks and time zone after making the change.
 
 ---
 
