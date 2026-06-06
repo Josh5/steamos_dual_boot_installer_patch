@@ -85,6 +85,12 @@ I have recorded a quick run through of this script on my ROG Ally X. You can wat
 
 (https://www.youtube.com/watch?v=sVW2MKR5cNk)
 
+Another creator also made a solid unofficial guide for using this project on the **ROG Ally X**:
+
+[![Watch the an excellent guide](https://img.youtube.com/vi/pd76H_FATT4/0.jpg)](https://www.youtube.com/watch?v=pd76H_FATT4)
+
+(https://www.youtube.com/watch?v=pd76H_FATT4)
+
 ---
 
 ## Configuration (optional)
