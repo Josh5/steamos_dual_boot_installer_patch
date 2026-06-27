@@ -1,0 +1,991 @@
+import { ListView, ScrollView } from "std-widgets.slint";
+
+export struct DiskCardData {
+    title: string,
+    subtitle: string,
+    details: string,
+    status: string,
+    is-selected: bool,
+    is-valid: bool,
+}
+
+export struct RegionCardData {
+    title: string,
+    subtitle: string,
+    details: string,
+    status: string,
+    is-selected: bool,
+    is-valid: bool,
+}
+
+component PrimaryButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in property <bool> compact: false;
+    callback clicked();
+
+    width: compact ? 144px : 172px;
+    height: compact ? 34px : 38px;
+    border-width: 1px;
+    border-color: enabled ? #7f8b96 : #b6bcc2;
+    background: enabled ? #d5d9de : #e6e9ec;
+
+    TouchArea {
+        clicked => {
+            if (root.enabled) {
+                root.clicked();
+            }
+        }
+    }
+
+    Text {
+        text: root.text;
+        color: root.enabled ? #1f2b36 : #8a929a;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        font-size: root.compact ? 12px : 13px;
+        font-weight: 800;
+    }
+}
+
+component SecondaryButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    in property <bool> compact: false;
+    callback clicked();
+
+    width: compact ? 124px : 142px;
+    height: compact ? 34px : 38px;
+    border-width: 1px;
+    border-color: enabled ? #8e98a2 : #bcc2c8;
+    background: enabled ? #cfd5db : #e4e8eb;
+
+    TouchArea {
+        clicked => {
+            if (root.enabled) {
+                root.clicked();
+            }
+        }
+    }
+
+    Text {
+        text: root.text;
+        color: root.enabled ? #24313b : #8a929a;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        font-size: root.compact ? 12px : 13px;
+        font-weight: 700;
+    }
+}
+
+component LinkButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked();
+
+    width: 196px;
+    height: 28px;
+    background: #00000000;
+
+    TouchArea {
+        clicked => {
+            if (root.enabled) {
+                root.clicked();
+            }
+        }
+    }
+
+    Text {
+        text: root.text;
+        color: root.enabled ? #2f6ea0 : #8a929a;
+        vertical-alignment: center;
+        horizontal-alignment: left;
+        font-size: 12px;
+        font-weight: 700;
+    }
+}
+
+component StageBadge inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    in property <bool> done;
+    height: 48px;
+    background: #dfe3e6;
+
+    Rectangle {
+        x: 2px;
+        y: 8px;
+        width: 3px;
+        height: parent.height - 16px;
+        background: active ? #2f77b1 : (done ? #7f95a8 : #b8c0c7);
+    }
+
+    Rectangle {
+        x: 18px;
+        y: 13px;
+        width: 18px;
+        height: 18px;
+        border-width: 1px;
+        border-color: active ? #4788bf : (done ? #879dac : #9aa6b0);
+        background: active ? #d8e6f1 : (done ? #edf1f4 : #f4f6f7);
+
+        Text {
+            text: root.done ? "✓" : "";
+            color: #2f6ea0;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+            font-size: 10px;
+            font-weight: 800;
+        }
+    }
+
+    Text {
+        x: 48px;
+        y: 1px;
+        width: parent.width - 48px;
+        height: parent.height - 2px;
+        text: label;
+        color: active ? #22303b : #5d6872;
+        vertical-alignment: center;
+        horizontal-alignment: left;
+        font-size: 14px;
+        font-weight: active ? 800 : 700;
+    }
+}
+
+component SectionPanel inherits Rectangle {
+    border-width: 1px;
+    border-color: #c7cdd2;
+    background: #f4f5f6;
+}
+
+component StatusTag inherits Rectangle {
+    in property <string> text;
+    in property <bool> valid;
+    width: 112px;
+    height: 24px;
+    border-width: 1px;
+    border-color: valid ? #8aa2b5 : #c39f9f;
+    background: valid ? #e8eef2 : #f3e7e7;
+
+    Text {
+        text: root.text;
+        color: valid ? #466883 : #8b5555;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        font-size: 11px;
+        font-weight: 800;
+    }
+}
+
+component WelcomeCheckItem inherits Rectangle {
+    in property <string> text;
+
+    height: 40px;
+    background: #00000000;
+
+    Text {
+        x: 0px;
+        width: 20px;
+        text: "✓";
+        color: #2f77b1;
+        vertical-alignment: center;
+        horizontal-alignment: center;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 26px;
+        width: parent.width - 26px;
+        height: parent.height;
+        text: root.text;
+        color: #33414c;
+        vertical-alignment: top;
+        horizontal-alignment: left;
+        font-size: 13px;
+        font-weight: 600;
+        wrap: word-wrap;
+    }
+}
+
+component WelcomeNumberItem inherits Rectangle {
+    in property <int> step;
+    in property <string> text;
+
+    height: 28px;
+    background: #00000000;
+
+    Text {
+        x: 0px;
+        width: 24px;
+        text: "\{root.step}.";
+        color: #2f77b1;
+        vertical-alignment: center;
+        horizontal-alignment: left;
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 28px;
+        width: parent.width - 28px;
+        height: parent.height;
+        text: root.text;
+        color: #33414c;
+        vertical-alignment: top;
+        horizontal-alignment: left;
+        font-size: 13px;
+        font-weight: 600;
+        wrap: word-wrap;
+    }
+}
+
+component WarningBanner inherits Rectangle {
+    in property <string> title;
+    in property <string> body;
+
+    border-width: 1px;
+    border-color: #c49a46;
+    background: #f2ead8;
+
+    Text {
+        x: 18px;
+        y: 16px;
+        width: 32px;
+        text: "⚠";
+        color: #ad7a20;
+        font-size: 28px;
+        font-weight: 900;
+    }
+
+    Text {
+        x: 72px;
+        y: 18px;
+        width: parent.width - 90px;
+        text: root.title;
+        color: #8a6419;
+        font-size: 16px;
+        font-weight: 800;
+        wrap: word-wrap;
+    }
+
+    Text {
+        x: 72px;
+        y: 40px;
+        width: parent.width - 90px;
+        text: root.body;
+        color: #6c5830;
+        font-size: 13px;
+        wrap: word-wrap;
+    }
+}
+
+component DataCard inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <string> details;
+    in property <string> status;
+    in property <bool> selected;
+    in property <bool> valid;
+    callback tapped();
+
+    border-width: 1px;
+    border-color: selected ? #5b8cb1 : (valid ? #b8c0c7 : #d1b7b7);
+    background: selected ? #ddeaf3 : #f3f4f5;
+    height: 166px;
+
+    TouchArea {
+        clicked => {
+            root.tapped();
+        }
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 7px;
+        height: parent.height;
+        background: selected ? #4f89b4 : (valid ? #bdc6cd : #cfa6a6);
+    }
+
+    StatusTag {
+        x: parent.width - self.width - 16px;
+        y: 14px;
+        text: root.status;
+        valid: root.valid;
+    }
+
+    Rectangle {
+        x: parent.width - 160px;
+        y: parent.height - 42px;
+        width: 144px;
+        height: 26px;
+        border-width: 1px;
+        border-color: selected ? #739fc1 : #b1b9c0;
+        background: selected ? #edf4f9 : #e6eaed;
+
+        Rectangle {
+            x: 8px;
+            y: 7px;
+            width: 12px;
+            height: 12px;
+            border-width: 1px;
+            border-color: selected ? #6d97b6 : #9ca8b1;
+            background: selected ? #5b8cb1 : #f4f6f7;
+        }
+
+        Text {
+            x: 28px;
+            width: parent.width - 36px;
+            text: selected ? "SELECTED" : "CLICK TO SELECT";
+            color: selected ? #29445a : #64717b;
+            vertical-alignment: center;
+            horizontal-alignment: left;
+            font-size: 10px;
+            font-weight: 800;
+        }
+    }
+
+    VerticalLayout {
+        x: 22px;
+        y: 18px;
+        width: parent.width - 180px;
+        height: parent.height - 36px;
+        spacing: 8px;
+
+        Text {
+            text: title;
+            color: #22303b;
+            font-size: 18px;
+            font-weight: 800;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: subtitle;
+            color: #6e7983;
+            font-size: 13px;
+            wrap: word-wrap;
+        }
+
+        Text {
+            text: details;
+            color: #3f4b56;
+            font-size: 12px;
+            wrap: word-wrap;
+            vertical-alignment: top;
+        }
+    }
+}
+
+export component AppWindow inherits Window {
+    in property <bool> root-ok: true;
+    in property <int> current-stage: 0;
+    in property <bool> dry-run: true;
+    in property <bool> can-next: true;
+    in property <bool> can-run: false;
+    in property <bool> can-close: true;
+    in property <string> root-message: "This installer must be launched with sudo.\n\nExample:\n  sudo ./steamos-installer-wizard";
+    in property <string> stage-subtitle: "Preview mode";
+    in property <string> selected-disk-summary: "Selected disk: /dev/nvme0n1\nDetected model: Example NVMe SSD\nCapacity: 953.9 GiB\nDetected free regions: 2";
+    in property <string> selected-region-summary: "Selected region: 524288 MiB -> 953344 MiB\nSize: 419.0 GiB";
+    in property <string> review-text: "The installer will target the selected disk and create the standard SteamOS partition layout inside the chosen unallocated region.\n\nTarget disk:\n    /dev/nvme0n1\nDetected model:\n    Example NVMe SSD\nSelected free space:\n    524288 MiB to 953344 MiB (419.0 GiB available)\nThe first new SteamOS partition will be created as:\n    partition 5\n\nThe installer will create 8 SteamOS partitions, including the final home partition that uses the remaining selected space.";
+    in property <string> param-text: "#  Part  Name       Purpose              Size       Notes\n1  p5    esp        EFI system           256 MiB    Created first\n2  p6    efi-A      SteamOS EFI A        64 MiB     Formatted by backend\n3  p7    efi-B      SteamOS EFI B        64 MiB     Formatted by backend";
+    in property <bool> show-advanced: false;
+    in property <string> execution-title: "Installer terminal launched";
+    in property <string> execution-text: "Preview mode";
+    in property <string> error-text: "";
+    in property <[DiskCardData]> disks;
+    in property <[RegionCardData]> regions;
+
+    callback select-disk(int);
+    callback select-region(int);
+    callback next();
+    callback back();
+    callback run-installer();
+    callback toggle-advanced();
+    callback open-prereq-link();
+    callback close-app();
+
+    title: "SteamOS Installer Wizard";
+    background: #eef1f3;
+    width: 1100px;
+    height: 720px;
+
+    if (!root-ok) : Rectangle {
+        background: #f2f4f6;
+        border-width: 1px;
+        border-color: #97a9b8;
+        x: 120px;
+        y: 100px;
+        width: parent.width - 240px;
+        height: parent.height - 200px;
+
+        VerticalLayout {
+            x: 36px;
+            y: 36px;
+            width: parent.width - 72px;
+            height: parent.height - 72px;
+            spacing: 18px;
+
+            Text {
+                text: "Root privileges required";
+                color: #22303b;
+                font-size: 30px;
+                font-weight: 800;
+            }
+
+            Text {
+                text: root-message;
+                color: #495661;
+                wrap: word-wrap;
+                font-size: 15px;
+            }
+
+            Rectangle { height: 1px; background: #c1c9cf; }
+
+            PrimaryButton {
+                text: "Close";
+                clicked => { root.close-app(); }
+            }
+        }
+    }
+
+    if (root-ok) : Rectangle {
+        background: #edf1f3;
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            width: parent.width;
+            height: 92px;
+            background: #163a59;
+            border-width: 1px;
+            border-color: #244865;
+
+            Text {
+                x: 24px;
+                y: 14px;
+                text: "SteamOS Dual-Boot Installer";
+                color: #f5f7f8;
+                font-size: 29px;
+                font-weight: 900;
+            }
+
+            Text {
+                x: 24px;
+                y: 54px;
+                width: parent.width - 220px;
+                text: stage-subtitle;
+                color: #c0ced9;
+                font-size: 14px;
+            }
+
+            Rectangle {
+                x: parent.width - 178px;
+                y: 18px;
+                width: 154px;
+                height: 32px;
+                background: dry-run ? #8c6a2f : #8c5f5f;
+                border-width: 1px;
+                border-color: dry-run ? #d1b06e : #c49595;
+
+                Text {
+                    text: dry-run ? "DRY RUN FORCED" : "LIVE MODE";
+                    color: #f6f1e6;
+                    vertical-alignment: center;
+                    horizontal-alignment: center;
+                    font-size: 12px;
+                    font-weight: 800;
+                }
+            }
+        }
+
+        Rectangle {
+            x: 0px;
+            y: 92px;
+            width: 228px;
+            height: parent.height - 158px;
+            background: #d9dde0;
+            border-width: 1px;
+            border-color: #c0c7cd;
+
+            VerticalLayout {
+                x: 18px;
+                y: 24px;
+                width: parent.width - 36px;
+                spacing: 8px;
+
+                StageBadge { label: "1  Welcome"; active: current-stage == 0; done: current-stage > 0; }
+                StageBadge { label: "2  Disk"; active: current-stage == 1; done: current-stage > 1; }
+                StageBadge { label: "3  Free Space"; active: current-stage == 2; done: current-stage > 2; }
+                StageBadge { label: "4  Review"; active: current-stage == 3; done: current-stage > 3; }
+                StageBadge { label: "5  Execute"; active: current-stage == 4; done: false; }
+            }
+        }
+
+        Rectangle {
+            x: 228px;
+            y: 92px;
+            width: parent.width - 228px;
+            height: parent.height - 158px;
+            background: #f0f2f4;
+
+            if (current-stage == 0) : Rectangle {
+                x: 20px;
+                y: 16px;
+                width: parent.width - 40px;
+                height: parent.height - 32px;
+
+                Text {
+                    x: 28px;
+                    y: 14px;
+                    text: "Install SteamOS into prepared free space";
+                    width: parent.width - 84px;
+                    color: #1f2b36;
+                    wrap: word-wrap;
+                    font-size: 29px;
+                    font-weight: 900;
+                }
+
+                Text {
+                    x: 28px;
+                    y: 102px;
+                    width: parent.width - 120px;
+                    text: "This wizard validates your choices, shows the partition plan, and launches the installer only after your final review.";
+                    color: #55626d;
+                    wrap: word-wrap;
+                    font-size: 14px;
+                }
+
+                Rectangle {
+                    x: 28px;
+                    y: 152px;
+                    width: parent.width - 56px;
+                    height: 1px;
+                    background: #ccd3d8;
+                }
+
+                Text {
+                    x: 28px;
+                    y: 178px;
+                    width: 34px;
+                    text: "◈";
+                    color: #2f77b1;
+                    font-size: 24px;
+                    font-weight: 800;
+                }
+
+                Text {
+                    x: 78px;
+                    y: 176px;
+                    text: "Before continuing";
+                    color: #22303b;
+                    font-size: 17px;
+                    font-weight: 800;
+                }
+
+                WelcomeCheckItem {
+                    x: 78px;
+                    y: 212px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    text: "Unallocated space already exists on the target disk.";
+                }
+
+                WelcomeCheckItem {
+                    x: 78px;
+                    y: 254px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    text: "This wizard will not resize existing partitions for you.";
+                }
+
+                WelcomeCheckItem {
+                    x: 78px;
+                    y: 296px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    text: "Nothing is executed until you reach the review stage.";
+                }
+
+                Text {
+                    x: ((parent.width - 96px) / 2) + 68px;
+                    y: 178px;
+                    width: 34px;
+                    text: "☰";
+                    color: #2f77b1;
+                    font-size: 22px;
+                    font-weight: 800;
+                }
+
+                Text {
+                    x: ((parent.width - 96px) / 2) + 118px;
+                    y: 176px;
+                    text: "What happens next";
+                    color: #22303b;
+                    font-size: 17px;
+                    font-weight: 800;
+                }
+
+                WelcomeNumberItem {
+                    x: ((parent.width - 96px) / 2) + 118px;
+                    y: 212px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    step: 1;
+                    text: "Select the target disk.";
+                }
+
+                WelcomeNumberItem {
+                    x: ((parent.width - 96px) / 2) + 118px;
+                    y: 244px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    step: 2;
+                    text: "Select the prepared free-space region.";
+                }
+
+                WelcomeNumberItem {
+                    x: ((parent.width - 96px) / 2) + 118px;
+                    y: 276px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    step: 3;
+                    text: "Review the SteamOS partition layout.";
+                }
+
+                WelcomeNumberItem {
+                    x: ((parent.width - 96px) / 2) + 118px;
+                    y: 308px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    step: 4;
+                    text: "Launch the installer in a terminal.";
+                }
+
+                WarningBanner {
+                    x: 20px;
+                    y: parent.height - 88px;
+                    width: parent.width - 40px;
+                    height: 72px;
+                    title: "Disk operations can cause data loss if the wrong disk or region is selected.";
+                    body: "Review every step carefully before running the installer.";
+                }
+            }
+
+            if (current-stage == 1) : Rectangle {
+                x: 20px;
+                y: 16px;
+                width: parent.width - 40px;
+                height: parent.height - 32px;
+
+                SectionPanel {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: 108px;
+
+                    Text {
+                        x: 20px;
+                        y: 16px;
+                        width: parent.width - 40px;
+                        height: parent.height - 32px;
+                        text: selected-disk-summary;
+                        color: #43505b;
+                        font-size: 14px;
+                        wrap: word-wrap;
+                        vertical-alignment: top;
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 126px;
+                    text: "Select a disk";
+                    color: #394651;
+                    font-size: 15px;
+                    font-weight: 800;
+                }
+
+                ListView {
+                    x: 0px;
+                    y: 154px;
+                    width: parent.width;
+                    height: parent.height - 154px;
+
+                    for disk[index] in disks : Rectangle {
+                        width: parent.width;
+                        height: 176px;
+                        background: #00000000;
+
+                        DataCard {
+                            width: parent.width - 16px;
+                            title: disk.title;
+                            subtitle: disk.subtitle;
+                            details: disk.details;
+                            status: disk.status;
+                            selected: disk.is-selected;
+                            valid: disk.is-valid;
+                            tapped => { root.select-disk(index); }
+                        }
+                    }
+                }
+            }
+
+            if (current-stage == 2) : Rectangle {
+                x: 20px;
+                y: 16px;
+                width: parent.width - 40px;
+                height: parent.height - 32px;
+
+                SectionPanel {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: 108px;
+
+                    HorizontalLayout {
+                        x: 20px;
+                        y: 14px;
+                        width: parent.width - 40px;
+                        height: parent.height - 28px;
+                        spacing: 16px;
+
+                        Rectangle {
+                            width: (parent.width - 17px) / 2;
+                            background: #00000000;
+
+                            Text {
+                                width: parent.width;
+                                height: parent.height;
+                                text: selected-disk-summary;
+                                color: #43505b;
+                                font-size: 14px;
+                                wrap: word-wrap;
+                                vertical-alignment: top;
+                            }
+                        }
+
+                        Rectangle {
+                            width: 1px;
+                            background: #c4ccd2;
+                        }
+
+                        Rectangle {
+                            width: (parent.width - 17px) / 2;
+                            background: #00000000;
+
+                            Text {
+                                width: parent.width;
+                                height: parent.height;
+                                text: selected-region-summary;
+                                color: #43505b;
+                                font-size: 14px;
+                                wrap: word-wrap;
+                                vertical-alignment: top;
+                            }
+                        }
+                    }
+                }
+
+                Text {
+                    x: 0px;
+                    y: 126px;
+                    text: "Select an unallocated region";
+                    color: #394651;
+                    font-size: 15px;
+                    font-weight: 800;
+                }
+
+                ListView {
+                    x: 0px;
+                    y: 154px;
+                    width: parent.width;
+                    height: parent.height - 154px;
+
+                    for region[index] in regions : Rectangle {
+                        width: parent.width;
+                        height: 176px;
+                        background: #00000000;
+
+                        DataCard {
+                            width: parent.width - 16px;
+                            title: region.title;
+                            subtitle: region.subtitle;
+                            details: region.details;
+                            status: region.status;
+                            selected: region.is-selected;
+                            valid: region.is-valid;
+                            tapped => { root.select-region(index); }
+                        }
+                    }
+                }
+            }
+
+            if (current-stage == 3) : Rectangle {
+                x: 20px;
+                y: 16px;
+                width: parent.width - 40px;
+                height: parent.height - 32px;
+
+                SectionPanel {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: show-advanced ? 286px : parent.height - 52px;
+
+                    ScrollView {
+                        x: 16px;
+                        y: 16px;
+                        width: parent.width - 32px;
+                        height: parent.height - 32px;
+
+                        Text {
+                            width: parent.width - 8px;
+                            text: review-text;
+                            color: #42505b;
+                            wrap: word-wrap;
+                            font-size: 14px;
+                            vertical-alignment: top;
+                        }
+                    }
+                }
+
+                LinkButton {
+                    x: 0px;
+                    y: 300px;
+                    text: show-advanced ? "Hide advanced details" : "Show advanced details";
+                    clicked => { root.toggle-advanced(); }
+                    visible: show-advanced;
+                }
+
+                LinkButton {
+                    x: 0px;
+                    y: parent.height - 34px;
+                    text: "Show advanced details";
+                    clicked => { root.toggle-advanced(); }
+                    visible: !show-advanced;
+                }
+
+                if (show-advanced) : SectionPanel {
+                    x: 0px;
+                    y: 336px;
+                    width: parent.width;
+                    height: parent.height - 336px;
+
+                    ScrollView {
+                        x: 16px;
+                        y: 16px;
+                        width: parent.width - 32px;
+                        height: parent.height - 32px;
+
+                        Text {
+                            width: parent.width - 8px;
+                            text: param-text;
+                            color: #55789a;
+                            font-family: "monospace";
+                            wrap: word-wrap;
+                            font-size: 13px;
+                            vertical-alignment: top;
+                        }
+                    }
+                }
+            }
+
+            if (current-stage == 4) : Rectangle {
+                x: 24px;
+                y: 20px;
+                width: parent.width - 48px;
+                height: parent.height - 40px;
+                background: #f4f5f6;
+                border-width: 1px;
+                border-color: #c7cdd2;
+
+                VerticalLayout {
+                    x: 28px;
+                    y: 28px;
+                    width: parent.width - 56px;
+                    spacing: 18px;
+
+                    Text {
+                        text: execution_title;
+                        color: #22303b;
+                        font-size: 28px;
+                        font-weight: 900;
+                    }
+
+                    Text {
+                        text: execution_text;
+                        color: #42505b;
+                        wrap: word-wrap;
+                        font-size: 14px;
+                    }
+
+                    if (error-text != "") : Rectangle {
+                        height: 110px;
+                        background: #f5eaea;
+                        border-width: 1px;
+                        border-color: #c79f9f;
+
+                        Text {
+                            x: 16px;
+                            y: 16px;
+                            width: parent.width - 32px;
+                            text: error-text;
+                            color: #8a5656;
+                            wrap: word-wrap;
+                            font-size: 13px;
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            x: 0px;
+            y: parent.height - 66px;
+            width: parent.width;
+            height: 66px;
+            background: #163a59;
+            border-width: 1px;
+            border-color: #244865;
+
+            SecondaryButton {
+                x: 18px;
+                y: 14px;
+                text: current-stage == 4 ? "Close" : "Cancel";
+                visible: current-stage >= 0;
+                enabled: current-stage == 4 ? can-close : true;
+                clicked => { root.close-app(); }
+            }
+
+            SecondaryButton {
+                x: parent.width - 324px;
+                y: 14px;
+                text: "< Back";
+                compact: true;
+                enabled: current-stage > 0 && current-stage < 4;
+                clicked => { root.back(); }
+            }
+
+            PrimaryButton {
+                x: parent.width - 170px;
+                y: 14px;
+                text: "Next >";
+                compact: true;
+                visible: current-stage < 3;
+                enabled: can-next;
+                clicked => { root.next(); }
+            }
+
+            PrimaryButton {
+                x: parent.width - 170px;
+                y: 14px;
+                text: dry-run ? "Run Dry Run" : "Run Install";
+                compact: true;
+                visible: current-stage == 3;
+                enabled: can-run;
+                clicked => { root.run-installer(); }
+            }
+        }
+    }
+}

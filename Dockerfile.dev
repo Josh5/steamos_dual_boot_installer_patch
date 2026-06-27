@@ -1,0 +1,27 @@
+FROM rust:1.92
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    bash \
+    build-essential \
+    pkg-config \
+    libx11-dev \
+    libxkbcommon-dev \
+    libwayland-dev \
+    libxrandr-dev \
+    libxinerama-dev \
+    libxcursor-dev \
+    libxi-dev \
+    libfontconfig-dev \
+    libfreetype6-dev \
+    libgl1-mesa-dev \
+    parted \
+    util-linux \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV HOME=/tmp \
+    XDG_CACHE_HOME=/tmp/.cache \
+    CARGO_HOME=/tmp/cargo \
+    CARGO_TARGET_DIR=/src/target \
+    PATH=/usr/local/cargo/bin:/usr/local/rustup/toolchains/stable-x86_64-unknown-linux-gnu/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+
+WORKDIR /src

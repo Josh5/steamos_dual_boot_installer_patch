@@ -1,1 +1,3 @@
 /tmp/**
+.cargo-cache/**
+target/**

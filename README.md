@@ -19,7 +19,7 @@ Valve’s recovery image assumes it owns the whole disk and wipes everything. Re
 
 ---
 
-## What the script does (high‑level)
+## What the script does
 
 - Detects the highest existing Windows partition number.
 - Creates the standard SteamOS partition set **after** your existing partitions:
