@@ -6,6 +6,10 @@ Latest GUI build:
 
 - [Download the latest release](https://github.com/Josh5/steamos_dual_boot_installer_patch/releases/latest)
 
+Download this binary from the latest release page:
+
+- `steamos-installer-wizard-<version>-linux-x86_64`
+
 > [!IMPORTANT]
 > You must shrink your Windows partition yourself in Windows before booting the SteamOS recovery image. This tool does not resize partitions. It creates the SteamOS partition set inside prepared unallocated space and performs the install there.
 
@@ -87,6 +91,12 @@ This is the recommended way to use the project.
 5. Let the wizard guide you through selecting the target disk and unallocated region, reviewing the install plan, and launching the installer.
 6. Reboot when finished and select SteamOS or Windows from your boot menu.
 
+Alternately, if you prefer using a terminal, you can also download and run the current latest GUI build with:
+
+```bash
+url="$(curl -fsSL https://api.github.com/repos/Josh5/steamos_dual_boot_installer_patch/releases/latest | grep -o 'https://[^"]*steamos-installer-wizard-[^"]*-linux-x86_64' | head -n 1)" && curl -fsSL "$url" -o /tmp/steamos-installer-wizard && chmod +x /tmp/steamos-installer-wizard && /tmp/steamos-installer-wizard
+```
+
 ## Script Install Flow
 
 Use this if you do not want to use the GUI, or if you want to simply run the installer script on its own (not really recomended tho).
@@ -153,6 +163,31 @@ sudo TARGET_DISK=/dev/nvme1n1 ROOT_SIZE=15G ./run.sh
 
 > [!WARNING]
 > This is not an official Valve workflow. Use it at your own risk.
+
+## High-Level Partition Layout
+
+This installer creates the standard SteamOS partition set inside the unallocated space you prepared. It does not replace your existing Windows partitions. It appends a new SteamOS layout after the partitions you already have on the selected disk.
+
+The installer creates 8 new partitions:
+
+- `esp`
+- `efi-A`
+- `efi-B`
+- `rootfs-A`
+- `rootfs-B`
+- `var-A`
+- `var-B`
+- `home`
+
+This means you will see:
+
+- 1 `esp` partition
+- 2 `efi` partitions: `efi-A` and `efi-B`
+- 2 root filesystem partitions: `rootfs-A` and `rootfs-B`
+- 2 `var` partitions: `var-A` and `var-B`
+- 1 `home` partition that uses the remaining selected space
+
+The two `efi` partitions and the two `rootfs` partitions are part of SteamOS's A/B system layout. That is expected and matches the official SteamOS recovery scripts.
 
 ## Credits
 
