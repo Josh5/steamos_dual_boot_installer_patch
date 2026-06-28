@@ -78,38 +78,11 @@ component SecondaryButton inherits Rectangle {
     }
 }
 
-component LinkButton inherits Rectangle {
-    in property <string> text;
-    in property <bool> enabled: true;
-    callback clicked();
-
-    width: 196px;
-    height: 28px;
-    background: #00000000;
-
-    TouchArea {
-        clicked => {
-            if (root.enabled) {
-                root.clicked();
-            }
-        }
-    }
-
-    Text {
-        text: root.text;
-        color: root.enabled ? #2f6ea0 : #8a929a;
-        vertical-alignment: center;
-        horizontal-alignment: left;
-        font-size: 12px;
-        font-weight: 700;
-    }
-}
-
 component StageBadge inherits Rectangle {
     in property <string> label;
     in property <bool> active;
     in property <bool> done;
-    height: 48px;
+    height: 42px;
     background: #dfe3e6;
 
     Rectangle {
@@ -122,9 +95,9 @@ component StageBadge inherits Rectangle {
 
     Rectangle {
         x: 18px;
-        y: 13px;
-        width: 18px;
-        height: 18px;
+        y: 11px;
+        width: 16px;
+        height: 16px;
         border-width: 1px;
         border-color: active ? #4788bf : (done ? #879dac : #9aa6b0);
         background: active ? #d8e6f1 : (done ? #edf1f4 : #f4f6f7);
@@ -148,7 +121,7 @@ component StageBadge inherits Rectangle {
         color: active ? #22303b : #5d6872;
         vertical-alignment: center;
         horizontal-alignment: left;
-        font-size: 14px;
+        font-size: 13px;
         font-weight: active ? 800 : 700;
     }
 }
@@ -157,6 +130,13 @@ component SectionPanel inherits Rectangle {
     border-width: 1px;
     border-color: #c7cdd2;
     background: #f4f5f6;
+}
+
+component SummaryText inherits Text {
+    color: #43505b;
+    font-size: 11px;
+    wrap: word-wrap;
+    vertical-alignment: top;
 }
 
 component StatusTag inherits Rectangle {
@@ -181,7 +161,7 @@ component StatusTag inherits Rectangle {
 component WelcomeCheckItem inherits Rectangle {
     in property <string> text;
 
-    height: 40px;
+    height: 34px;
     background: #00000000;
 
     Text {
@@ -203,7 +183,7 @@ component WelcomeCheckItem inherits Rectangle {
         color: #33414c;
         vertical-alignment: top;
         horizontal-alignment: left;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
         wrap: word-wrap;
     }
@@ -213,7 +193,7 @@ component WelcomeNumberItem inherits Rectangle {
     in property <int> step;
     in property <string> text;
 
-    height: 28px;
+    height: 24px;
     background: #00000000;
 
     Text {
@@ -235,7 +215,7 @@ component WelcomeNumberItem inherits Rectangle {
         color: #33414c;
         vertical-alignment: top;
         horizontal-alignment: left;
-        font-size: 13px;
+        font-size: 12px;
         font-weight: 600;
         wrap: word-wrap;
     }
@@ -278,6 +258,35 @@ component WarningBanner inherits Rectangle {
         color: #6c5830;
         font-size: 13px;
         wrap: word-wrap;
+        vertical-alignment: top;
+    }
+}
+
+component ReviewRow inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+
+    height: 28px;
+    background: #00000000;
+
+    Text {
+        x: 0px;
+        y: 0px;
+        width: 164px;
+        text: root.label;
+        color: #22303b;
+        font-size: 14px;
+        font-weight: 800;
+    }
+
+    Text {
+        x: 180px;
+        y: 0px;
+        width: parent.width - 180px;
+        text: root.value;
+        color: #42505b;
+        font-size: 14px;
+        wrap: word-wrap;
     }
 }
 
@@ -293,7 +302,7 @@ component DataCard inherits Rectangle {
     border-width: 1px;
     border-color: selected ? #5b8cb1 : (valid ? #b8c0c7 : #d1b7b7);
     background: selected ? #ddeaf3 : #f3f4f5;
-    height: 166px;
+    height: 124px;
 
     TouchArea {
         clicked => {
@@ -304,32 +313,32 @@ component DataCard inherits Rectangle {
     Rectangle {
         x: 0px;
         y: 0px;
-        width: 7px;
+        width: 6px;
         height: parent.height;
         background: selected ? #4f89b4 : (valid ? #bdc6cd : #cfa6a6);
     }
 
     StatusTag {
         x: parent.width - self.width - 16px;
-        y: 14px;
+        y: 12px;
         text: root.status;
         valid: root.valid;
     }
 
     Rectangle {
         x: parent.width - 160px;
-        y: parent.height - 42px;
+        y: parent.height - 36px;
         width: 144px;
-        height: 26px;
+        height: 22px;
         border-width: 1px;
         border-color: selected ? #739fc1 : #b1b9c0;
         background: selected ? #edf4f9 : #e6eaed;
 
         Rectangle {
             x: 8px;
-            y: 7px;
-            width: 12px;
-            height: 12px;
+            y: 6px;
+            width: 10px;
+            height: 10px;
             border-width: 1px;
             border-color: selected ? #6d97b6 : #9ca8b1;
             background: selected ? #5b8cb1 : #f4f6f7;
@@ -342,22 +351,22 @@ component DataCard inherits Rectangle {
             color: selected ? #29445a : #64717b;
             vertical-alignment: center;
             horizontal-alignment: left;
-            font-size: 10px;
+            font-size: 9px;
             font-weight: 800;
         }
     }
 
     VerticalLayout {
         x: 22px;
-        y: 18px;
+        y: 14px;
         width: parent.width - 180px;
-        height: parent.height - 36px;
-        spacing: 8px;
+        height: parent.height - 28px;
+        spacing: 4px;
 
         Text {
             text: title;
             color: #22303b;
-            font-size: 18px;
+            font-size: 16px;
             font-weight: 800;
             wrap: word-wrap;
         }
@@ -365,14 +374,14 @@ component DataCard inherits Rectangle {
         Text {
             text: subtitle;
             color: #6e7983;
-            font-size: 13px;
+            font-size: 12px;
             wrap: word-wrap;
         }
 
         Text {
             text: details;
             color: #3f4b56;
-            font-size: 12px;
+            font-size: 11px;
             wrap: word-wrap;
             vertical-alignment: top;
         }
@@ -380,19 +389,19 @@ component DataCard inherits Rectangle {
 }
 
 export component AppWindow inherits Window {
-    in property <bool> root-ok: true;
     in property <int> current-stage: 0;
     in property <bool> dry-run: true;
     in property <bool> can-next: true;
     in property <bool> can-run: false;
     in property <bool> can-close: true;
-    in property <string> root-message: "This installer must be launched with sudo.\n\nExample:\n  sudo ./steamos-installer-wizard";
     in property <string> stage-subtitle: "Preview mode";
+    in property <string> wizard-version: "Version 1.0";
     in property <string> selected-disk-summary: "Selected disk: /dev/nvme0n1\nDetected model: Example NVMe SSD\nCapacity: 953.9 GiB\nDetected free regions: 2";
     in property <string> selected-region-summary: "Selected region: 524288 MiB -> 953344 MiB\nSize: 419.0 GiB";
-    in property <string> review-text: "The installer will target the selected disk and create the standard SteamOS partition layout inside the chosen unallocated region.\n\nTarget disk:\n    /dev/nvme0n1\nDetected model:\n    Example NVMe SSD\nSelected free space:\n    524288 MiB to 953344 MiB (419.0 GiB available)\nThe first new SteamOS partition will be created as:\n    partition 5\n\nThe installer will create 8 SteamOS partitions, including the final home partition that uses the remaining selected space.";
-    in property <string> param-text: "#  Part  Name       Purpose              Size       Notes\n1  p5    esp        EFI system           256 MiB    Created first\n2  p6    efi-A      SteamOS EFI A        64 MiB     Formatted by backend\n3  p7    efi-B      SteamOS EFI B        64 MiB     Formatted by backend";
-    in property <bool> show-advanced: false;
+    in property <string> review-target-disk: "/dev/nvme0n1";
+    in property <string> review-detected-model: "Example NVMe SSD";
+    in property <string> review-selected-free-space: "524288 MiB to 953344 MiB (419.0 GiB available)";
+    in property <string> review-summary-text: "The installer will create 8 SteamOS partitions, including the final home partition that uses the remaining selected space.\n\nThe first new SteamOS partition will be created as partition 5.";
     in property <string> execution-title: "Installer terminal launched";
     in property <string> execution-text: "Preview mode";
     in property <string> error-text: "";
@@ -404,55 +413,14 @@ export component AppWindow inherits Window {
     callback next();
     callback back();
     callback run-installer();
-    callback toggle-advanced();
-    callback open-prereq-link();
     callback close-app();
 
     title: "SteamOS Installer Wizard";
     background: #eef1f3;
-    width: 1100px;
-    height: 720px;
+    width: 1024px;
+    height: 640px;
 
-    if (!root-ok) : Rectangle {
-        background: #f2f4f6;
-        border-width: 1px;
-        border-color: #97a9b8;
-        x: 120px;
-        y: 100px;
-        width: parent.width - 240px;
-        height: parent.height - 200px;
-
-        VerticalLayout {
-            x: 36px;
-            y: 36px;
-            width: parent.width - 72px;
-            height: parent.height - 72px;
-            spacing: 18px;
-
-            Text {
-                text: "Root privileges required";
-                color: #22303b;
-                font-size: 30px;
-                font-weight: 800;
-            }
-
-            Text {
-                text: root-message;
-                color: #495661;
-                wrap: word-wrap;
-                font-size: 15px;
-            }
-
-            Rectangle { height: 1px; background: #c1c9cf; }
-
-            PrimaryButton {
-                text: "Close";
-                clicked => { root.close-app(); }
-            }
-        }
-    }
-
-    if (root-ok) : Rectangle {
+    Rectangle {
         background: #edf1f3;
         x: 0px;
         y: 0px;
@@ -463,44 +431,44 @@ export component AppWindow inherits Window {
             x: 0px;
             y: 0px;
             width: parent.width;
-            height: 92px;
+            height: 78px;
             background: #163a59;
             border-width: 1px;
             border-color: #244865;
 
             Text {
                 x: 24px;
-                y: 14px;
+                y: 12px;
                 text: "SteamOS Dual-Boot Installer";
                 color: #f5f7f8;
-                font-size: 29px;
+                font-size: 24px;
                 font-weight: 900;
             }
 
             Text {
                 x: 24px;
-                y: 54px;
+                y: 46px;
                 width: parent.width - 220px;
                 text: stage-subtitle;
                 color: #c0ced9;
-                font-size: 14px;
+                font-size: 12px;
             }
 
-            Rectangle {
+            if (dry-run) : Rectangle {
                 x: parent.width - 178px;
-                y: 18px;
+                y: 16px;
                 width: 154px;
-                height: 32px;
-                background: dry-run ? #8c6a2f : #8c5f5f;
+                height: 28px;
+                background: #8c6a2f;
                 border-width: 1px;
-                border-color: dry-run ? #d1b06e : #c49595;
+                border-color: #d1b06e;
 
                 Text {
-                    text: dry-run ? "DRY RUN FORCED" : "LIVE MODE";
+                    text: "DRY RUN FORCED";
                     color: #f6f1e6;
                     vertical-alignment: center;
                     horizontal-alignment: center;
-                    font-size: 12px;
+                    font-size: 11px;
                     font-weight: 800;
                 }
             }
@@ -508,18 +476,18 @@ export component AppWindow inherits Window {
 
         Rectangle {
             x: 0px;
-            y: 92px;
-            width: 228px;
-            height: parent.height - 158px;
+            y: 78px;
+            width: 204px;
+            height: parent.height - 136px;
             background: #d9dde0;
             border-width: 1px;
             border-color: #c0c7cd;
 
             VerticalLayout {
-                x: 18px;
-                y: 24px;
+                x: 16px;
+                y: 18px;
                 width: parent.width - 36px;
-                spacing: 8px;
+                spacing: 6px;
 
                 StageBadge { label: "1  Welcome"; active: current-stage == 0; done: current-stage > 0; }
                 StageBadge { label: "2  Disk"; active: current-stage == 1; done: current-stage > 1; }
@@ -527,13 +495,25 @@ export component AppWindow inherits Window {
                 StageBadge { label: "4  Review"; active: current-stage == 3; done: current-stage > 3; }
                 StageBadge { label: "5  Execute"; active: current-stage == 4; done: false; }
             }
+
+            Text {
+                x: 16px;
+                y: parent.height - 30px;
+                width: parent.width - 32px;
+                text: wizard-version;
+                color: #64707a;
+                horizontal-alignment: left;
+                vertical-alignment: center;
+                font-size: 11px;
+                font-weight: 700;
+            }
         }
 
         Rectangle {
-            x: 228px;
-            y: 92px;
-            width: parent.width - 228px;
-            height: parent.height - 158px;
+            x: 204px;
+            y: 78px;
+            width: parent.width - 204px;
+            height: parent.height - 136px;
             background: #f0f2f4;
 
             if (current-stage == 0) : Rectangle {
@@ -549,23 +529,23 @@ export component AppWindow inherits Window {
                     width: parent.width - 84px;
                     color: #1f2b36;
                     wrap: word-wrap;
-                    font-size: 29px;
+                    font-size: 24px;
                     font-weight: 900;
                 }
 
                 Text {
                     x: 28px;
-                    y: 102px;
+                    y: 84px;
                     width: parent.width - 120px;
-                    text: "This wizard validates your choices, shows the partition plan, and launches the installer only after your final review.";
+                    text: "This wizard will guide you through installing SteamOS onto a disk of your choice.";
                     color: #55626d;
                     wrap: word-wrap;
-                    font-size: 14px;
+                    font-size: 13px;
                 }
 
                 Rectangle {
                     x: 28px;
-                    y: 152px;
+                    y: 128px;
                     width: parent.width - 56px;
                     height: 1px;
                     background: #ccd3d8;
@@ -573,66 +553,59 @@ export component AppWindow inherits Window {
 
                 Text {
                     x: 28px;
-                    y: 178px;
+                    y: 148px;
                     width: 34px;
                     text: "◈";
-                    color: #2f77b1;
-                    font-size: 24px;
-                    font-weight: 800;
-                }
-
-                Text {
-                    x: 78px;
-                    y: 176px;
-                    text: "Before continuing";
-                    color: #22303b;
-                    font-size: 17px;
-                    font-weight: 800;
-                }
-
-                WelcomeCheckItem {
-                    x: 78px;
-                    y: 212px;
-                    width: ((parent.width - 96px) / 2) - 62px;
-                    text: "Unallocated space already exists on the target disk.";
-                }
-
-                WelcomeCheckItem {
-                    x: 78px;
-                    y: 254px;
-                    width: ((parent.width - 96px) / 2) - 62px;
-                    text: "This wizard will not resize existing partitions for you.";
-                }
-
-                WelcomeCheckItem {
-                    x: 78px;
-                    y: 296px;
-                    width: ((parent.width - 96px) / 2) - 62px;
-                    text: "Nothing is executed until you reach the review stage.";
-                }
-
-                Text {
-                    x: ((parent.width - 96px) / 2) + 68px;
-                    y: 178px;
-                    width: 34px;
-                    text: "☰";
                     color: #2f77b1;
                     font-size: 22px;
                     font-weight: 800;
                 }
 
                 Text {
+                    x: 78px;
+                    y: 146px;
+                    text: "Before continuing";
+                    color: #22303b;
+                    font-size: 15px;
+                    font-weight: 800;
+                }
+
+                WelcomeCheckItem {
+                    x: 78px;
+                    y: 180px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    text: "Unallocated space already exists on the target disk.";
+                }
+
+                WelcomeCheckItem {
+                    x: 78px;
+                    y: 216px;
+                    width: ((parent.width - 96px) / 2) - 62px;
+                    text: "The available unallocated space is more than 32 GiB.";
+                }
+
+                Text {
+                    x: ((parent.width - 96px) / 2) + 68px;
+                    y: 148px;
+                    width: 34px;
+                    text: "☰";
+                    color: #2f77b1;
+                    font-size: 20px;
+                    font-weight: 800;
+                }
+
+                Text {
                     x: ((parent.width - 96px) / 2) + 118px;
-                    y: 176px;
+                    y: 146px;
                     text: "What happens next";
                     color: #22303b;
-                    font-size: 17px;
+                    font-size: 15px;
                     font-weight: 800;
                 }
 
                 WelcomeNumberItem {
                     x: ((parent.width - 96px) / 2) + 118px;
-                    y: 212px;
+                    y: 180px;
                     width: ((parent.width - 96px) / 2) - 62px;
                     step: 1;
                     text: "Select the target disk.";
@@ -640,7 +613,7 @@ export component AppWindow inherits Window {
 
                 WelcomeNumberItem {
                     x: ((parent.width - 96px) / 2) + 118px;
-                    y: 244px;
+                    y: 208px;
                     width: ((parent.width - 96px) / 2) - 62px;
                     step: 2;
                     text: "Select the prepared free-space region.";
@@ -648,7 +621,7 @@ export component AppWindow inherits Window {
 
                 WelcomeNumberItem {
                     x: ((parent.width - 96px) / 2) + 118px;
-                    y: 276px;
+                    y: 236px;
                     width: ((parent.width - 96px) / 2) - 62px;
                     step: 3;
                     text: "Review the SteamOS partition layout.";
@@ -656,7 +629,7 @@ export component AppWindow inherits Window {
 
                 WelcomeNumberItem {
                     x: ((parent.width - 96px) / 2) + 118px;
-                    y: 308px;
+                    y: 264px;
                     width: ((parent.width - 96px) / 2) - 62px;
                     step: 4;
                     text: "Launch the installer in a terminal.";
@@ -664,7 +637,7 @@ export component AppWindow inherits Window {
 
                 WarningBanner {
                     x: 20px;
-                    y: parent.height - 88px;
+                    y: parent.height - 84px;
                     width: parent.width - 40px;
                     height: 72px;
                     title: "Disk operations can cause data loss if the wrong disk or region is selected.";
@@ -682,39 +655,35 @@ export component AppWindow inherits Window {
                     x: 0px;
                     y: 0px;
                     width: parent.width;
-                    height: 108px;
+                    height: 80px;
 
-                    Text {
-                        x: 20px;
-                        y: 16px;
-                        width: parent.width - 40px;
-                        height: parent.height - 32px;
+                    SummaryText {
+                        x: 16px;
+                        y: 10px;
+                        width: parent.width - 32px;
+                        height: parent.height - 20px;
                         text: selected-disk-summary;
-                        color: #43505b;
-                        font-size: 14px;
-                        wrap: word-wrap;
-                        vertical-alignment: top;
                     }
                 }
 
                 Text {
                     x: 0px;
-                    y: 126px;
+                    y: 102px;
                     text: "Select a disk";
                     color: #394651;
-                    font-size: 15px;
+                    font-size: 14px;
                     font-weight: 800;
                 }
 
                 ListView {
                     x: 0px;
-                    y: 154px;
+                    y: 126px;
                     width: parent.width;
-                    height: parent.height - 154px;
+                    height: parent.height - 126px;
 
                     for disk[index] in disks : Rectangle {
                         width: parent.width;
-                        height: 176px;
+                        height: 132px;
                         background: #00000000;
 
                         DataCard {
@@ -741,27 +710,23 @@ export component AppWindow inherits Window {
                     x: 0px;
                     y: 0px;
                     width: parent.width;
-                    height: 108px;
+                    height: 80px;
 
                     HorizontalLayout {
-                        x: 20px;
-                        y: 14px;
-                        width: parent.width - 40px;
-                        height: parent.height - 28px;
-                        spacing: 16px;
+                        x: 16px;
+                        y: 10px;
+                        width: parent.width - 32px;
+                        height: parent.height - 20px;
+                        spacing: 12px;
 
                         Rectangle {
                             width: (parent.width - 17px) / 2;
                             background: #00000000;
 
-                            Text {
+                            SummaryText {
                                 width: parent.width;
                                 height: parent.height;
                                 text: selected-disk-summary;
-                                color: #43505b;
-                                font-size: 14px;
-                                wrap: word-wrap;
-                                vertical-alignment: top;
                             }
                         }
 
@@ -774,14 +739,10 @@ export component AppWindow inherits Window {
                             width: (parent.width - 17px) / 2;
                             background: #00000000;
 
-                            Text {
+                            SummaryText {
                                 width: parent.width;
                                 height: parent.height;
                                 text: selected-region-summary;
-                                color: #43505b;
-                                font-size: 14px;
-                                wrap: word-wrap;
-                                vertical-alignment: top;
                             }
                         }
                     }
@@ -789,22 +750,22 @@ export component AppWindow inherits Window {
 
                 Text {
                     x: 0px;
-                    y: 126px;
+                    y: 102px;
                     text: "Select an unallocated region";
                     color: #394651;
-                    font-size: 15px;
+                    font-size: 14px;
                     font-weight: 800;
                 }
 
                 ListView {
                     x: 0px;
-                    y: 154px;
+                    y: 126px;
                     width: parent.width;
-                    height: parent.height - 154px;
+                    height: parent.height - 126px;
 
                     for region[index] in regions : Rectangle {
                         width: parent.width;
-                        height: 176px;
+                        height: 132px;
                         background: #00000000;
 
                         DataCard {
@@ -831,7 +792,7 @@ export component AppWindow inherits Window {
                     x: 0px;
                     y: 0px;
                     width: parent.width;
-                    height: show-advanced ? 286px : parent.height - 52px;
+                    height: parent.height;
 
                     ScrollView {
                         x: 16px;
@@ -839,53 +800,35 @@ export component AppWindow inherits Window {
                         width: parent.width - 32px;
                         height: parent.height - 32px;
 
-                        Text {
+                        Rectangle {
                             width: parent.width - 8px;
-                            text: review-text;
-                            color: #42505b;
-                            wrap: word-wrap;
-                            font-size: 14px;
-                            vertical-alignment: top;
-                        }
-                    }
-                }
+                            height: 220px;
+                            background: #00000000;
 
-                LinkButton {
-                    x: 0px;
-                    y: 300px;
-                    text: show-advanced ? "Hide advanced details" : "Show advanced details";
-                    clicked => { root.toggle-advanced(); }
-                    visible: show-advanced;
-                }
+                            Text {
+                                x: 0px;
+                                y: 0px;
+                                width: parent.width;
+                                text: "The installer will target the selected disk and create the standard SteamOS partition layout inside the chosen unallocated region.";
+                                color: #42505b;
+                                wrap: word-wrap;
+                                font-size: 14px;
+                            }
 
-                LinkButton {
-                    x: 0px;
-                    y: parent.height - 34px;
-                    text: "Show advanced details";
-                    clicked => { root.toggle-advanced(); }
-                    visible: !show-advanced;
-                }
+                            ReviewRow { x: 0px; y: 52px; width: parent.width; label: "Target disk:"; value: review-target-disk; }
+                            ReviewRow { x: 0px; y: 84px; width: parent.width; label: "Detected model:"; value: review-detected-model; }
+                            ReviewRow { x: 0px; y: 116px; width: parent.width; label: "Selected free space:"; value: review-selected-free-space; }
 
-                if (show-advanced) : SectionPanel {
-                    x: 0px;
-                    y: 336px;
-                    width: parent.width;
-                    height: parent.height - 336px;
-
-                    ScrollView {
-                        x: 16px;
-                        y: 16px;
-                        width: parent.width - 32px;
-                        height: parent.height - 32px;
-
-                        Text {
-                            width: parent.width - 8px;
-                            text: param-text;
-                            color: #55789a;
-                            font-family: "monospace";
-                            wrap: word-wrap;
-                            font-size: 13px;
-                            vertical-alignment: top;
+                            Text {
+                                x: 0px;
+                                y: 164px;
+                                width: parent.width;
+                                text: review-summary-text;
+                                color: #42505b;
+                                wrap: word-wrap;
+                                font-size: 14px;
+                                vertical-alignment: top;
+                            }
                         }
                     }
                 }
@@ -942,16 +885,16 @@ export component AppWindow inherits Window {
 
         Rectangle {
             x: 0px;
-            y: parent.height - 66px;
+            y: parent.height - 58px;
             width: parent.width;
-            height: 66px;
+            height: 58px;
             background: #163a59;
             border-width: 1px;
             border-color: #244865;
 
             SecondaryButton {
                 x: 18px;
-                y: 14px;
+                y: 10px;
                 text: current-stage == 4 ? "Close" : "Cancel";
                 visible: current-stage >= 0;
                 enabled: current-stage == 4 ? can-close : true;
@@ -960,7 +903,7 @@ export component AppWindow inherits Window {
 
             SecondaryButton {
                 x: parent.width - 324px;
-                y: 14px;
+                y: 10px;
                 text: "< Back";
                 compact: true;
                 enabled: current-stage > 0 && current-stage < 4;
@@ -969,7 +912,7 @@ export component AppWindow inherits Window {
 
             PrimaryButton {
                 x: parent.width - 170px;
-                y: 14px;
+                y: 10px;
                 text: "Next >";
                 compact: true;
                 visible: current-stage < 3;
@@ -979,7 +922,7 @@ export component AppWindow inherits Window {
 
             PrimaryButton {
                 x: parent.width - 170px;
-                y: 14px;
+                y: 10px;
                 text: dry-run ? "Run Dry Run" : "Run Install";
                 compact: true;
                 visible: current-stage == 3;

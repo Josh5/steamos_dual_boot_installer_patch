@@ -11,20 +11,20 @@ const EMBEDDED_RUN_SH: &str = include_str!("../run.sh");
 
 pub struct LaunchSummary {
     pub script_path: PathBuf,
+    pub wrapper_path: PathBuf,
     pub command_preview: String,
 }
 
 pub fn launch(plan: InstallPlan) -> Result<LaunchSummary, String> {
     let temp_dir = make_temp_dir()?;
     let script_path = temp_dir.join("run.sh");
+    let wrapper_path = temp_dir.join("launch-installer.sh");
     fs::write(&script_path, EMBEDDED_RUN_SH).map_err(|error| format!("failed to write temporary script: {error}"))?;
+    fs::write(&wrapper_path, build_wrapper_script(&plan, &script_path))
+        .map_err(|error| format!("failed to write temporary launcher: {error}"))?;
 
-    let mut permissions = fs::metadata(&script_path)
-        .map_err(|error| format!("failed to stat temporary script: {error}"))?
-        .permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(&script_path, permissions)
-        .map_err(|error| format!("failed to mark temporary script executable: {error}"))?;
+    mark_executable(&script_path)?;
+    mark_executable(&wrapper_path)?;
 
     let terminal = find_terminal().ok_or_else(|| {
         String::from("no supported terminal emulator was found (tried konsole, x-terminal-emulator, kgx, gnome-terminal)")
@@ -32,29 +32,63 @@ pub fn launch(plan: InstallPlan) -> Result<LaunchSummary, String> {
 
     let mut command = Command::new(&terminal.binary);
     command.current_dir(&temp_dir);
-    command.env("STEAMOS_SILENT", "1");
-    command.env("STEAMOS_DRY_RUN", if plan.dry_run { "1" } else { "0" });
-    command.env("TARGET_DISK", &plan.target_disk);
-    command.env("FREE_REGION_START_MIB", plan.free_start_mib.to_string());
-    command.env("FREE_REGION_END_MIB", plan.free_end_mib.to_string());
-    command.env("FIRST_NEW_PARTITION", plan.first_new_partition.to_string());
-    command.env("ESP_SIZE", "256M");
-    command.env("EFI_SIZE", "64M");
-    command.env("ROOT_SIZE", "11G");
-    command.env("VAR_SIZE", "1G");
 
-    terminal.add_args(&mut command, &script_path);
+    terminal.add_args(&mut command, &wrapper_path);
 
     command
         .spawn()
         .map_err(|error| format!("failed to launch terminal '{}': {error}", terminal.binary))?;
 
-    let command_preview = terminal.preview(&script_path);
+    let command_preview = terminal.preview(&wrapper_path);
 
     Ok(LaunchSummary {
         script_path,
+        wrapper_path,
         command_preview,
     })
+}
+
+fn build_wrapper_script(plan: &InstallPlan, script_path: &PathBuf) -> String {
+    format!(
+        r#"#!/usr/bin/env bash
+set -euo pipefail
+
+cd {temp_dir}
+exec sudo \
+  STEAMOS_SILENT=1 \
+  STEAMOS_DRY_RUN={dry_run} \
+  TARGET_DISK={target_disk} \
+  FREE_REGION_START_MIB={free_start_mib} \
+  FREE_REGION_END_MIB={free_end_mib} \
+  FIRST_NEW_PARTITION={first_new_partition} \
+  ESP_SIZE=256M \
+  EFI_SIZE=64M \
+  ROOT_SIZE=11G \
+  VAR_SIZE=1G \
+  bash {script_path}
+"#,
+        temp_dir = shell_quote(script_path.parent().unwrap()),
+        dry_run = if plan.dry_run { "1" } else { "0" },
+        target_disk = shell_quote(&plan.target_disk),
+        free_start_mib = plan.free_start_mib,
+        free_end_mib = plan.free_end_mib,
+        first_new_partition = plan.first_new_partition,
+        script_path = shell_quote(script_path),
+    )
+}
+
+fn mark_executable(path: &PathBuf) -> Result<(), String> {
+    let mut permissions = fs::metadata(path)
+        .map_err(|error| format!("failed to stat '{}': {error}", path.display()))?
+        .permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions)
+        .map_err(|error| format!("failed to mark '{}' executable: {error}", path.display()))
+}
+
+fn shell_quote(path: impl AsRef<std::path::Path>) -> String {
+    let value = path.as_ref().to_string_lossy();
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
 struct TerminalCommand {

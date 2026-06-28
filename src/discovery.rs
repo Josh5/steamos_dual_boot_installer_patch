@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::process::{Command, Output};
 
 use serde::Deserialize;
 
@@ -9,7 +9,6 @@ pub struct DiskRecord {
     pub size_bytes: u64,
     pub model: String,
     pub vendor: String,
-    pub transport: String,
     pub partitions: Vec<PartitionRecord>,
     pub free_regions: Vec<FreeRegion>,
     pub highest_partition: u32,
@@ -108,19 +107,15 @@ impl PartitionRecord {
 }
 
 pub fn discover_disks() -> Result<Vec<DiskRecord>, String> {
-    let lsblk = Command::new("lsblk")
-        .args([
+    let lsblk = run_command(
+        "lsblk",
+        &[
             "-J",
             "-b",
             "-o",
             "NAME,PATH,SIZE,TYPE,MODEL,VENDOR,TRAN,FSTYPE,LABEL,PARTLABEL,MOUNTPOINTS",
-        ])
-        .output()
-        .map_err(|error| format!("failed to run lsblk: {error}"))?;
-
-    if !lsblk.status.success() {
-        return Err(String::from_utf8_lossy(&lsblk.stderr).trim().to_string());
-    }
+        ],
+    )?;
 
     let document: LsblkDocument = serde_json::from_slice(&lsblk.stdout)
         .map_err(|error| format!("failed to parse lsblk output: {error}"))?;
@@ -143,7 +138,6 @@ pub fn discover_disks() -> Result<Vec<DiskRecord>, String> {
             size_bytes: device.size,
             model: device.model.unwrap_or_default().trim().to_string(),
             vendor: device.vendor.unwrap_or_default().trim().to_string(),
-            transport: device.transport.unwrap_or_default().trim().to_string(),
             partitions: Vec::new(),
             free_regions: Vec::new(),
             highest_partition: 0,
@@ -175,16 +169,43 @@ pub fn discover_disks() -> Result<Vec<DiskRecord>, String> {
 }
 
 fn discover_free_regions(disk_path: &str) -> Result<Vec<FreeRegion>, String> {
-    let parted = Command::new("parted")
-        .args(["-m", "-s", disk_path, "unit", "MiB", "print", "free"])
-        .output()
-        .map_err(|error| format!("failed to run parted: {error}"))?;
-
-    if !parted.status.success() {
-        return Err(String::from_utf8_lossy(&parted.stderr).trim().to_string());
-    }
+    let parted = run_command("parted", &["-m", "-s", disk_path, "unit", "MiB", "print", "free"])?;
 
     parse_parted_free(&String::from_utf8_lossy(&parted.stdout))
+}
+
+fn run_command(binary: &str, args: &[&str]) -> Result<Output, String> {
+    let output = Command::new(binary)
+        .args(args)
+        .output()
+        .map_err(|error| format!("failed to run {binary}: {error}"))?;
+
+    if output.status.success() {
+        return Ok(output);
+    }
+
+    if command_may_need_privilege(&output) {
+        if let Ok(sudo_output) = Command::new("sudo").arg("-n").arg(binary).args(args).output() {
+            if sudo_output.status.success() {
+                return Ok(sudo_output);
+            }
+        }
+    }
+
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if stderr.is_empty() {
+        Err(format!("{binary} exited with status {}", output.status))
+    } else {
+        Err(stderr)
+    }
+}
+
+fn command_may_need_privilege(output: &Output) -> bool {
+    let stderr = String::from_utf8_lossy(&output.stderr).to_lowercase();
+    stderr.contains("permission denied")
+        || stderr.contains("not permitted")
+        || stderr.contains("cannot open")
+        || stderr.contains("failed to open")
 }
 
 fn parse_parted_free(raw: &str) -> Result<Vec<FreeRegion>, String> {
@@ -205,12 +226,12 @@ fn parse_parted_free(raw: &str) -> Result<Vec<FreeRegion>, String> {
             continue;
         }
 
-        let start = parse_mib(fields[1])?;
-        let end = parse_mib(fields[2])?;
-        let size = parse_mib(fields[3])?;
-        if size < 1 {
+        let start = parse_mib_ceil(fields[1])?;
+        let end = parse_mib_floor(fields[2])?;
+        if end <= start {
             continue;
         }
+        let size = end - start;
 
         regions.push(FreeRegion {
             start_mib: start,
@@ -222,12 +243,20 @@ fn parse_parted_free(raw: &str) -> Result<Vec<FreeRegion>, String> {
     Ok(regions)
 }
 
-fn parse_mib(value: &str) -> Result<u64, String> {
+fn parse_mib_floor(value: &str) -> Result<u64, String> {
     let trimmed = value.trim().trim_end_matches("MiB");
     let parsed = trimmed
         .parse::<f64>()
         .map_err(|error| format!("failed to parse MiB value '{trimmed}': {error}"))?;
     Ok(parsed.floor() as u64)
+}
+
+fn parse_mib_ceil(value: &str) -> Result<u64, String> {
+    let trimmed = value.trim().trim_end_matches("MiB");
+    let parsed = trimmed
+        .parse::<f64>()
+        .map_err(|error| format!("failed to parse MiB value '{trimmed}': {error}"))?;
+    Ok(parsed.ceil() as u64)
 }
 
 fn partition_number(path: &str) -> u32 {
@@ -277,8 +306,6 @@ struct LsblkDevice {
     model: Option<String>,
     #[serde(rename = "vendor")]
     vendor: Option<String>,
-    #[serde(rename = "tran")]
-    transport: Option<String>,
     #[serde(rename = "fstype")]
     fs_type: Option<String>,
     #[serde(rename = "label")]

@@ -4,27 +4,26 @@ mod plan;
 
 use std::cell::RefCell;
 use std::process;
-use std::process::Command;
 use std::rc::{Rc, Weak};
 
 use discovery::{DiskRecord, FreeRegion};
 use launcher::LaunchSummary;
 use plan::{InstallPlan, PlanOptions};
-use slint::{ModelRc, VecModel};
+use slint::{Model, ModelRc, VecModel};
 
 slint::include_modules!();
 
-const DRY_RUN_FORCED: bool = true;
+const DRY_RUN_FORCED: bool = cfg!(feature = "dry-run-forced");
+const RUN_SH_VERSION: &str = env!("RUN_SH_VERSION");
 
 struct AppState {
-    root_ok: bool,
-    has_root: bool,
     current_stage: i32,
     disks: Vec<DiskRecord>,
+    disk_rows: Rc<VecModel<DiskCardData>>,
+    region_rows: Rc<VecModel<RegionCardData>>,
     selected_disk: Option<usize>,
     selected_region: Option<usize>,
     plan: Option<InstallPlan>,
-    show_advanced_details: bool,
     dry_run: bool,
     execution_text: String,
     execution_title: String,
@@ -32,27 +31,24 @@ struct AppState {
 }
 
 impl AppState {
-    fn new(has_root: bool) -> Self {
-        let root_ok = has_root || DRY_RUN_FORCED;
-        let disks = if root_ok {
-            discovery::discover_disks().unwrap_or_default()
-        } else {
-            Vec::new()
+    fn new() -> Self {
+        let (disks, error_text) = match discovery::discover_disks() {
+            Ok(disks) => (disks, String::new()),
+            Err(error) => (Vec::new(), format!("Disk discovery failed: {error}")),
         };
 
         Self {
-            root_ok,
-            has_root,
-            current_stage: if root_ok { 0 } else { -1 },
+            current_stage: 0,
             disks,
+            disk_rows: Rc::new(VecModel::from(Vec::<DiskCardData>::new())),
+            region_rows: Rc::new(VecModel::from(Vec::<RegionCardData>::new())),
             selected_disk: None,
             selected_region: None,
             plan: None,
-            show_advanced_details: false,
             dry_run: DRY_RUN_FORCED,
             execution_text: String::new(),
             execution_title: String::from("Waiting to launch installer"),
-            error_text: String::new(),
+            error_text,
         }
     }
 
@@ -118,7 +114,6 @@ impl AppState {
         self.selected_disk = Some(index);
         self.selected_region = None;
         self.plan = None;
-        self.show_advanced_details = false;
         self.error_text.clear();
     }
 
@@ -132,20 +127,9 @@ impl AppState {
         }
         self.selected_region = Some(index);
         self.rebuild_plan();
-        self.show_advanced_details = false;
-    }
-
-    fn toggle_advanced(&mut self) {
-        self.show_advanced_details = !self.show_advanced_details;
     }
 
     fn launch(&mut self) -> bool {
-        if !self.has_root && !self.dry_run {
-            self.error_text =
-                String::from("Root privileges are required before launching a real installer run.");
-            return false;
-        }
-
         let Some(plan) = self.plan.clone() else {
             self.error_text = String::from("Install plan is not ready.");
             return false;
@@ -173,9 +157,14 @@ impl AppState {
 }
 
 fn main() -> Result<(), slint::PlatformError> {
-    let has_root = unsafe { libc::geteuid() == 0 };
     let app = AppWindow::new()?;
-    let state = Rc::new(RefCell::new(AppState::new(has_root)));
+    let state = Rc::new(RefCell::new(AppState::new()));
+
+    {
+        let state_ref = state.borrow();
+        app.set_disks(ModelRc::from(state_ref.disk_rows.clone()));
+        app.set_regions(ModelRc::from(state_ref.region_rows.clone()));
+    }
 
     sync_ui(&app, &state);
 
@@ -243,44 +232,14 @@ fn wire_callbacks(app: &AppWindow, state: Weak<RefCell<AppState>>) {
         }
     });
 
-    let state_toggle_advanced = state.clone();
-    let weak = app.as_weak();
-    app.on_toggle_advanced(move || {
-        if let Some(state) = state_toggle_advanced.upgrade() {
-            state.borrow_mut().toggle_advanced();
-            if let Some(app) = weak.upgrade() {
-                sync_ui(&app, &state);
-            }
-        }
-    });
-
-    let state_open_prereq = state.clone();
-    let weak = app.as_weak();
-    app.on_open_prereq_link(move || {
-        let open_result = Command::new("xdg-open")
-            .arg("https://github.com/Josh5/steamos_dual_boot_installer_patch#prerequisites-do-these-in-windows-before-recovery")
-            .spawn();
-
-        if let Err(error) = open_result {
-            if let Some(state) = state_open_prereq.upgrade() {
-                state.borrow_mut().error_text =
-                    format!("Failed to open the prerequisites link in a browser: {error}");
-                if let Some(app) = weak.upgrade() {
-                    sync_ui(&app, &state);
-                }
-            }
-        }
-    });
-
     app.on_close_app(move || {
         process::exit(0);
     });
 }
 
 fn sync_ui(app: &AppWindow, state: &Rc<RefCell<AppState>>) {
-    let state_ref = state.borrow();
+    let state_ref = state.borrow_mut();
 
-    app.set_root_ok(state_ref.root_ok);
     app.set_current_stage(state_ref.current_stage);
     app.set_dry_run(state_ref.dry_run);
     app.set_can_next(state_ref.can_next());
@@ -289,18 +248,14 @@ fn sync_ui(app: &AppWindow, state: &Rc<RefCell<AppState>>) {
     app.set_execution_title(state_ref.execution_title.clone().into());
     app.set_execution_text(state_ref.execution_text.clone().into());
     app.set_error_text(state_ref.error_text.clone().into());
-    let root_message = if state_ref.dry_run && !state_ref.has_root {
-        "Forced dry-run mode is active, so the wizard can be used without sudo.\n\nLaunch with sudo before attempting a real install:\n  sudo ./steamos-installer-wizard"
-    } else {
-        "This installer must be launched with sudo.\n\nExample:\n  sudo ./steamos-installer-wizard"
-    };
-    app.set_root_message(root_message.into());
     app.set_selected_disk_summary(selected_disk_summary(&state_ref).into());
     app.set_selected_region_summary(selected_region_summary(&state_ref).into());
-    app.set_review_text(review_text(&state_ref).into());
-    app.set_param_text(param_text(&state_ref).into());
-    app.set_show_advanced(state_ref.show_advanced_details);
     app.set_stage_subtitle(stage_subtitle(&state_ref).into());
+    app.set_wizard_version(format!("Version {RUN_SH_VERSION}").into());
+    app.set_review_target_disk(review_target_disk(&state_ref).into());
+    app.set_review_detected_model(review_detected_model(&state_ref).into());
+    app.set_review_selected_free_space(review_selected_free_space(&state_ref).into());
+    app.set_review_summary_text(review_summary_text(&state_ref).into());
 
     let disk_rows = state_ref
         .disks
@@ -321,8 +276,8 @@ fn sync_ui(app: &AppWindow, state: &Rc<RefCell<AppState>>) {
                 )
                 .into(),
                 details: format!(
-                    "Transport: {}\nPartitions: {}\nLargest free region: {}\n{}",
-                    display_or_unknown(&disk.transport),
+                    "Free regions: {} | Largest: {}\nPartitions: {} | {}",
+                    disk.free_regions.len(),
                     disk.partitions.len(),
                     disk.largest_free_region_human(),
                     disk.partition_summary()
@@ -340,7 +295,7 @@ fn sync_ui(app: &AppWindow, state: &Rc<RefCell<AppState>>) {
             }
         })
         .collect::<Vec<_>>();
-    app.set_disks(ModelRc::from(Rc::new(VecModel::from(disk_rows))));
+    replace_rows(&state_ref.disk_rows, disk_rows);
 
     let region_rows = state_ref
         .selected_disk_record()
@@ -356,7 +311,7 @@ fn sync_ui(app: &AppWindow, state: &Rc<RefCell<AppState>>) {
                     )
                     .into(),
                     details: format!(
-                        "Start: {} MiB\nEnd: {} MiB\n{}",
+                        "Start: {} MiB | End: {} MiB\n{}",
                         region.start_mib,
                         region.end_mib,
                         if plan::region_is_large_enough(region) {
@@ -377,7 +332,7 @@ fn sync_ui(app: &AppWindow, state: &Rc<RefCell<AppState>>) {
                 .collect::<Vec<_>>()
         })
         .unwrap_or_default();
-    app.set_regions(ModelRc::from(Rc::new(VecModel::from(region_rows))));
+    replace_rows(&state_ref.region_rows, region_rows);
 }
 
 fn stage_subtitle(state: &AppState) -> String {
@@ -416,33 +371,56 @@ fn selected_region_summary(state: &AppState) -> String {
     }
 }
 
-fn review_text(state: &AppState) -> String {
+fn review_target_disk(state: &AppState) -> String {
+    state.selected_disk_record()
+        .map(|disk| disk.path.clone())
+        .unwrap_or_else(|| String::from("Not selected"))
+}
+
+fn review_detected_model(state: &AppState) -> String {
+    state.selected_disk_record()
+        .map(|disk| disk.display_name())
+        .unwrap_or_else(|| String::from("Not selected"))
+}
+
+fn review_selected_free_space(state: &AppState) -> String {
     match &state.plan {
-        Some(plan) => plan.review_text(),
-        None => String::from("Select a disk and a valid unallocated region to build the install plan."),
+        Some(plan) => plan.review_selected_free_space(),
+        None => String::from("Not selected"),
     }
 }
 
-fn param_text(state: &AppState) -> String {
+fn review_summary_text(state: &AppState) -> String {
     match &state.plan {
-        Some(plan) => plan.advanced_text(),
-        None => String::from("Advanced partition details will appear here once the install plan has been calculated."),
+        Some(plan) => plan.review_summary_text(),
+        None => String::from("Select a disk and a valid unallocated region to build the install plan."),
     }
 }
 
 fn render_launch_summary(summary: &LaunchSummary, dry_run: bool) -> String {
     format!(
-        "Temporary script written:\n  {}\n\nTerminal command:\n  {}\n\nMode:\n  {}\n\nContinue the installer flow in the launched terminal window.",
+        "Temporary script written:\n  {}\n\nTemporary launcher written:\n  {}\n\nTerminal command:\n  {}\n\nMode:\n  {}\n\nThe launched terminal will prompt for sudo before backend execution starts.",
         summary.script_path.display(),
+        summary.wrapper_path.display(),
         summary.command_preview,
         if dry_run { "DRY RUN" } else { "LIVE" }
     )
 }
 
-fn display_or_unknown(value: &str) -> String {
-    if value.trim().is_empty() {
-        String::from("Unknown")
-    } else {
-        value.to_string()
+fn replace_rows<T: Clone + 'static>(model: &Rc<VecModel<T>>, new_rows: Vec<T>) {
+    let current = model.row_count();
+    let target = new_rows.len();
+
+    for (index, row) in new_rows.into_iter().enumerate() {
+        if index < current {
+            model.set_row_data(index, row);
+        } else {
+            model.push(row);
+        }
+    }
+
+    while model.row_count() > target {
+        let last = model.row_count() - 1;
+        model.remove(last);
     }
 }

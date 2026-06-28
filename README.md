@@ -1,8 +1,8 @@
 # SteamOS Dual Boot Installer Patch
 
-Patch the **official SteamOS recovery installer** so you can install SteamOS **into already‑created free space** on your SSD — **without wiping your existing Windows install**.
+Install SteamOS **into already‑created free space** on your SSD — **without wiping your existing Windows install**.
 
-> ✅ You **must** shrink your Windows C: partition yourself in Windows and leave **Unallocated** space **before** booting the SteamOS recovery image. This script **does not** resize partitions; it only patches the installer to target the free space you prepared.
+> ✅ You **must** shrink your Windows C: partition yourself in Windows and leave **Unallocated** space **before** booting the SteamOS recovery image. This script **does not** resize partitions; it creates the SteamOS partition set in that prepared free space and performs the install directly.
 
 ---
 
@@ -15,7 +15,7 @@ Patch the **official SteamOS recovery installer** so you can install SteamOS **i
 
 ## Why this exists
 
-Valve’s recovery image assumes it owns the whole disk and wipes everything. Reinstalling Windows afterwards is slow and unnecessary. This project **patches the recovery’s `repair_device.sh`** so it installs SteamOS into your **unallocated free space** instead of erasing the disk.
+Valve’s recovery image assumes it owns the whole disk and wipes everything. Reinstalling Windows afterwards is slow and unnecessary. This project installs SteamOS into your **unallocated free space** instead of erasing the disk.
 
 ---
 
@@ -24,8 +24,8 @@ Valve’s recovery image assumes it owns the whole disk and wipes everything. Re
 - Detects the highest existing Windows partition number.
 - Creates the standard SteamOS partition set **after** your existing partitions:
   - `esp`, `efi-A`, `efi-B`, `rootfs-A`, `rootfs-B`, `var-A`, `var-B`, and `home` (remaining space).
-- Formats the new partitions and **patches** the recovery’s `repair_device.sh` to target them.
-- Invokes the installer to lay down SteamOS into those partitions.
+- Formats the new partitions and lays out the SteamOS partition set there.
+- Copies the SteamOS recovery rootfs into the new system partitions and finalizes the boot configuration.
 - **Does not** shrink/resize Windows or touch existing Windows partitions.
 
 > Defaults: `TARGET_DISK=/dev/nvme0n1`, sizes can be overridden via env vars: `ESP_SIZE`, `EFI_SIZE`, `ROOT_SIZE`, `VAR_SIZE`.
@@ -89,7 +89,7 @@ Valve’s recovery image assumes it owns the whole disk and wipes everything. Re
    ```
 
 4. The script will show the **highest existing partition** and ask for the starting number for new SteamOS partitions (default is correct in most cases). Confirm to proceed.
-5. When prompted, it will patch the installer and start the SteamOS install targeting the new partitions.
+5. When prompted, it will start the SteamOS install targeting the new partitions.
 6. Reboot when done. Use your boot menu/manager to select SteamOS or Windows.
 
 ---

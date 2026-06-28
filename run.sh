@@ -4,21 +4,19 @@
 # Project: steamos_dual_boot_installer_patch
 # File Created: Sunday, 19th October 2025 7:30:31 pm
 # Author: Josh.5 (jsunnex@gmail.com)
+# Version: 2.1
 # -----
-# Last Modified: Saturday, 27th June 2026 12:32:45 pm
+# Last Modified: Sunday, 28th June 2026 11:30:55 am
 # Modified By: Josh.5 (jsunnex@gmail.com)
 ###
 
 set -euo pipefail
 
-# Automatically carve out the standard SteamOS partition set after the last
-# existing Windows partition, patch the repair script to target those new
-# partitions, and kick off the SteamOS system reinstall.
+# Create the SteamOS partition set inside prepared free space, then perform the
+# install directly. This script no longer patches Valve's recovery script at
+# runtime; it owns the partitioning and install flow itself.
 
 TARGET_DISK=${TARGET_DISK:-/dev/nvme0n1}
-TOOLS_DIR=${TOOLS_DIR:-/home/deck/tools}
-REPAIR_SCRIPT=${REPAIR_SCRIPT:-${TOOLS_DIR}/repair_device.sh}
-PATCHED_SCRIPT=${PATCHED_SCRIPT:-${TOOLS_DIR}/repair_device.patched.sh}
 STEAMOS_SILENT=${STEAMOS_SILENT:-0}
 STEAMOS_DRY_RUN=${STEAMOS_DRY_RUN:-0}
 FREE_REGION_START_MIB=${FREE_REGION_START_MIB:-}
@@ -31,14 +29,59 @@ EFI_SIZE=${EFI_SIZE:-64M}
 ROOT_SIZE=${ROOT_SIZE:-11G}
 VAR_SIZE=${VAR_SIZE:-1G}
 
+TYPE_GUID_ESP=C12A7328F81F11D2BA4B00A0C93EC93B
+TYPE_GUID_EFI=EBD0A0A2B9E5443387C068B6B72699C7
+TYPE_GUID_ROOT=4F68BCE3E8CD4DB196E7FBCAF984B709
+TYPE_GUID_VAR=4D21B016B53445C2A9FB5C16E091FD2D
+TYPE_GUID_HOME=933AC7E12EB44F13B8440E14E2AEF915
+
+SCRIPT_VERSION=$(sed -n 's/^# Version: //p' "$0" | head -n 1)
+SCRIPT_VERSION=${SCRIPT_VERSION:-unknown}
+
+root_fs_frozen=0
+
 error() {
     echo "Error: $*" >&2
     exit 1
 }
 
+log() {
+    echo "==> $*"
+}
+
 require_cmd() {
     command -v "$1" >/dev/null 2>&1 || error "Command '$1' is required but not found."
 }
+
+run_sgdisk_checked() {
+    local output status
+
+    set +e
+    output=$(sgdisk "$@" "$TARGET_DISK" 2>&1)
+    status=$?
+    set -e
+
+    if ((status != 0)); then
+        printf '%s\n' "$output" >&2
+        error "sgdisk exited with status $status."
+    fi
+
+    if grep -qiE 'could not create partition|unable to set partition|unable to change partition|error encountered' <<<"$output"; then
+        printf '%s\n' "$output" >&2
+        error "sgdisk reported a partitioning error."
+    fi
+
+    printf '%s\n' "$output"
+}
+
+cleanup() {
+    if [[ ${root_fs_frozen:-0} == 1 ]]; then
+        fsfreeze -u / || true
+        root_fs_frozen=0
+    fi
+}
+
+trap cleanup EXIT
 
 part_path() {
     local disk=$1
@@ -86,9 +129,6 @@ Options:
 
 Environment variables:
   TARGET_DISK         Target disk device (default: /dev/nvme0n1)
-  TOOLS_DIR           Directory containing repair_device.sh (default: /home/deck/tools)
-  REPAIR_SCRIPT       Path to the original repair script
-  PATCHED_SCRIPT      Path to write the patched repair script
   STEAMOS_SILENT      Run without interactive prompts (1/0)
   STEAMOS_DRY_RUN     Print the plan and exit before partitioning (1/0)
   FREE_REGION_START_MIB
@@ -150,8 +190,65 @@ parse_args() {
     fi
 }
 
+wait_for_partition() {
+    local path=$1
+    local attempt
+    for attempt in {1..10}; do
+        if [[ -b $path ]]; then
+            return 0
+        fi
+        udevadm settle || true
+        sleep 1
+    done
+    error "Partition device '$path' did not appear."
+}
+
+verify_part() {
+    local device=$1
+    local expected_type=$2
+    local expected_partlabel=$3
+    local actual_type actual_partlabel
+
+    actual_type=$(blkid -o value -s TYPE "$device" || true)
+    actual_partlabel=$(blkid -o value -s PARTLABEL "$device" || true)
+
+    [[ $actual_type == "$expected_type" ]] || error "Device '$device' is type '$actual_type', expected '$expected_type'."
+    [[ $actual_partlabel == "$expected_partlabel" ]] || error "Device '$device' has PARTLABEL '$actual_partlabel', expected '$expected_partlabel'."
+}
+
+imageroot() {
+    local srcroot=$1
+    local newroot=$2
+    log "Imaging $newroot from $srcroot"
+    dd if="$srcroot" of="$newroot" bs=128M status=progress oflag=sync
+    btrfstune -f -u "$newroot"
+    btrfs check "$newroot"
+}
+
+finalize_part() {
+    local partset=$1
+    log "Finalizing partset $partset"
+    steamos-chroot --no-overlay --disk "$TARGET_DISK" --partset "$partset" -- mkdir -p /efi/SteamOS
+    steamos-chroot --no-overlay --disk "$TARGET_DISK" --partset "$partset" -- mkdir -p /esp/SteamOS/conf
+    steamos-chroot --no-overlay --disk "$TARGET_DISK" --partset "$partset" -- steamos-partsets /efi/SteamOS/partsets
+    steamos-chroot --no-overlay --disk "$TARGET_DISK" --partset "$partset" -- steamos-bootconf create --image "$partset" --conf-dir /esp/SteamOS/conf --efi-dir /efi --set title "$partset"
+    steamos-chroot --no-overlay --disk "$TARGET_DISK" --partset "$partset" -- grub-mkimage
+    steamos-chroot --no-overlay --disk "$TARGET_DISK" --partset "$partset" -- update-grub
+}
+
 main() {
+    local highest_part number default_start start_part
+    local esp_num efi_a_num efi_b_num root_a_num root_b_num var_a_num var_b_num home_num
+    local esp_mib efi_mib root_mib var_mib fixed_total_mib free_region_size_mib current_start home_mib
+    local rootdevice
+
     parse_args "$@"
+
+    cat <<EOF
+SteamOS Installer Backend
+Version ${SCRIPT_VERSION}
+EOF
+    sleep 3
 
     [[ $EUID -eq 0 ]] || error "Please run as root."
 
@@ -163,11 +260,17 @@ main() {
     require_cmd mkfs.ext4
     require_cmd tune2fs
     require_cmd udevadm
+    require_cmd partprobe
+    require_cmd blkid
+    require_cmd dd
+    require_cmd btrfstune
+    require_cmd btrfs
+    require_cmd fsfreeze
+    require_cmd findmnt
+    require_cmd steamos-chroot
+    require_cmd steamcl-install
 
     [[ -b $TARGET_DISK ]] || error "Target disk '$TARGET_DISK' not found."
-    if [[ $STEAMOS_DRY_RUN != 1 ]]; then
-        [[ -f $REPAIR_SCRIPT ]] || error "Expected repair script at '$REPAIR_SCRIPT' but it was not found."
-    fi
 
     if [[ $STEAMOS_SILENT == 1 ]]; then
         [[ -n $FREE_REGION_START_MIB ]] || error "FREE_REGION_START_MIB is required in silent mode."
@@ -189,18 +292,16 @@ main() {
     echo
 
     highest_part=0
-    mapfile -t partitions < <(lsblk -nrpo NAME "$TARGET_DISK" | tail -n +2)
-    for dev in "${partitions[@]}"; do
+    while IFS= read -r dev; do
         number=$(sed -n 's/.*[^0-9]\([0-9]\+\)$/\1/p' <<<"$dev")
         [[ -n $number ]] || continue
         ((number > highest_part)) && highest_part=$number
-    done
+    done < <(lsblk -nrpo NAME "$TARGET_DISK" | tail -n +2)
 
-    suffix=$([[ $TARGET_DISK =~ [0-9]$ ]] && printf 'p')
     if ((highest_part == 0)); then
         echo "No existing partitions detected on $TARGET_DISK."
     else
-        echo "Highest existing partition detected: ${TARGET_DISK}${suffix}${highest_part}"
+        echo "Highest existing partition detected: $(part_path "$TARGET_DISK" "$highest_part")"
     fi
 
     if [[ $STEAMOS_SILENT == 1 ]]; then
@@ -265,121 +366,93 @@ main() {
         exit 0
     fi
 
-    echo "Creating SteamOS partitions..."
+    log "Creating SteamOS partitions"
     for num in "$esp_num" "$efi_a_num" "$efi_b_num" "$root_a_num" "$root_b_num" "$var_a_num" "$var_b_num" "$home_num"; do
         sgdisk --delete="$num" "$TARGET_DISK" >/dev/null 2>&1 || true
     done
 
     if [[ $STEAMOS_SILENT == 1 ]]; then
         current_start=$FREE_REGION_START_MIB
-        sgdisk "-n${esp_num}:${current_start}MiB:+${ESP_SIZE}" "-c${esp_num}:esp" "-t${esp_num}:C12A7328F81F11D2BA4B00A0C93EC93B" "$TARGET_DISK"
+        run_sgdisk_checked "-n${esp_num}:${current_start}MiB:+${ESP_SIZE}" "-c${esp_num}:esp" "-t${esp_num}:${TYPE_GUID_ESP}"
         current_start=$((current_start + esp_mib))
-        sgdisk "-n${efi_a_num}:${current_start}MiB:+${EFI_SIZE}" "-c${efi_a_num}:efi-A" "-t${efi_a_num}:EBD0A0A2B9E5443387C068B6B72699C7" "$TARGET_DISK"
+        run_sgdisk_checked "-n${efi_a_num}:${current_start}MiB:+${EFI_SIZE}" "-c${efi_a_num}:efi-A" "-t${efi_a_num}:${TYPE_GUID_EFI}"
         current_start=$((current_start + efi_mib))
-        sgdisk "-n${efi_b_num}:${current_start}MiB:+${EFI_SIZE}" "-c${efi_b_num}:efi-B" "-t${efi_b_num}:EBD0A0A2B9E5443387C068B6B72699C7" "$TARGET_DISK"
+        run_sgdisk_checked "-n${efi_b_num}:${current_start}MiB:+${EFI_SIZE}" "-c${efi_b_num}:efi-B" "-t${efi_b_num}:${TYPE_GUID_EFI}"
         current_start=$((current_start + efi_mib))
-        sgdisk "-n${root_a_num}:${current_start}MiB:+${ROOT_SIZE}" "-c${root_a_num}:rootfs-A" "-t${root_a_num}:4F68BCE3E8CD4DB196E7FBCAF984B709" "$TARGET_DISK"
+        run_sgdisk_checked "-n${root_a_num}:${current_start}MiB:+${ROOT_SIZE}" "-c${root_a_num}:rootfs-A" "-t${root_a_num}:${TYPE_GUID_ROOT}"
         current_start=$((current_start + root_mib))
-        sgdisk "-n${root_b_num}:${current_start}MiB:+${ROOT_SIZE}" "-c${root_b_num}:rootfs-B" "-t${root_b_num}:4F68BCE3E8CD4DB196E7FBCAF984B709" "$TARGET_DISK"
+        run_sgdisk_checked "-n${root_b_num}:${current_start}MiB:+${ROOT_SIZE}" "-c${root_b_num}:rootfs-B" "-t${root_b_num}:${TYPE_GUID_ROOT}"
         current_start=$((current_start + root_mib))
-        sgdisk "-n${var_a_num}:${current_start}MiB:+${VAR_SIZE}" "-c${var_a_num}:var-A" "-t${var_a_num}:4D21B016B53445C2A9FB5C16E091FD2D" "$TARGET_DISK"
+        run_sgdisk_checked "-n${var_a_num}:${current_start}MiB:+${VAR_SIZE}" "-c${var_a_num}:var-A" "-t${var_a_num}:${TYPE_GUID_VAR}"
         current_start=$((current_start + var_mib))
-        sgdisk "-n${var_b_num}:${current_start}MiB:+${VAR_SIZE}" "-c${var_b_num}:var-B" "-t${var_b_num}:4D21B016B53445C2A9FB5C16E091FD2D" "$TARGET_DISK"
+        run_sgdisk_checked "-n${var_b_num}:${current_start}MiB:+${VAR_SIZE}" "-c${var_b_num}:var-B" "-t${var_b_num}:${TYPE_GUID_VAR}"
         current_start=$((current_start + var_mib))
-        sgdisk "-n${home_num}:${current_start}MiB:${FREE_REGION_END_MIB}MiB" "-c${home_num}:home" "-t${home_num}:933AC7E12EB44F13B8440E14E2AEF915" "$TARGET_DISK"
+        home_mib=$((FREE_REGION_END_MIB - current_start - 1))
+        ((home_mib > 0)) || error "Selected free-space region leaves no room for the final home partition after alignment. Choose a larger region."
+        run_sgdisk_checked "-n${home_num}:${current_start}MiB:+${home_mib}M" "-c${home_num}:home" "-t${home_num}:${TYPE_GUID_HOME}"
     else
-        sgdisk -n${esp_num}:0:+${ESP_SIZE} -c${esp_num}:"esp" -t${esp_num}:C12A7328F81F11D2BA4B00A0C93EC93B "$TARGET_DISK"
-        sgdisk -n${efi_a_num}:0:+${EFI_SIZE} -c${efi_a_num}:"efi-A" -t${efi_a_num}:EBD0A0A2B9E5443387C068B6B72699C7 "$TARGET_DISK"
-        sgdisk -n${efi_b_num}:0:+${EFI_SIZE} -c${efi_b_num}:"efi-B" -t${efi_b_num}:EBD0A0A2B9E5443387C068B6B72699C7 "$TARGET_DISK"
-        sgdisk -n${root_a_num}:0:+${ROOT_SIZE} -c${root_a_num}:"rootfs-A" -t${root_a_num}:4F68BCE3E8CD4DB196E7FBCAF984B709 "$TARGET_DISK"
-        sgdisk -n${root_b_num}:0:+${ROOT_SIZE} -c${root_b_num}:"rootfs-B" -t${root_b_num}:4F68BCE3E8CD4DB196E7FBCAF984B709 "$TARGET_DISK"
-        sgdisk -n${var_a_num}:0:+${VAR_SIZE} -c${var_a_num}:"var-A" -t${var_a_num}:4D21B016B53445C2A9FB5C16E091FD2D "$TARGET_DISK"
-        sgdisk -n${var_b_num}:0:+${VAR_SIZE} -c${var_b_num}:"var-B" -t${var_b_num}:4D21B016B53445C2A9FB5C16E091FD2D "$TARGET_DISK"
-        sgdisk -n${home_num}:0:0 -c${home_num}:"home" -t${home_num}:933AC7E12EB44F13B8440E14E2AEF915 "$TARGET_DISK"
+        run_sgdisk_checked "-n${esp_num}:0:+${ESP_SIZE}" "-c${esp_num}:esp" "-t${esp_num}:${TYPE_GUID_ESP}"
+        run_sgdisk_checked "-n${efi_a_num}:0:+${EFI_SIZE}" "-c${efi_a_num}:efi-A" "-t${efi_a_num}:${TYPE_GUID_EFI}"
+        run_sgdisk_checked "-n${efi_b_num}:0:+${EFI_SIZE}" "-c${efi_b_num}:efi-B" "-t${efi_b_num}:${TYPE_GUID_EFI}"
+        run_sgdisk_checked "-n${root_a_num}:0:+${ROOT_SIZE}" "-c${root_a_num}:rootfs-A" "-t${root_a_num}:${TYPE_GUID_ROOT}"
+        run_sgdisk_checked "-n${root_b_num}:0:+${ROOT_SIZE}" "-c${root_b_num}:rootfs-B" "-t${root_b_num}:${TYPE_GUID_ROOT}"
+        run_sgdisk_checked "-n${var_a_num}:0:+${VAR_SIZE}" "-c${var_a_num}:var-A" "-t${var_a_num}:${TYPE_GUID_VAR}"
+        run_sgdisk_checked "-n${var_b_num}:0:+${VAR_SIZE}" "-c${var_b_num}:var-B" "-t${var_b_num}:${TYPE_GUID_VAR}"
+        run_sgdisk_checked "-n${home_num}:0:0" "-c${home_num}:home" "-t${home_num}:${TYPE_GUID_HOME}"
     fi
 
     partprobe "$TARGET_DISK"
     udevadm settle
 
-    echo "Formatting partitions for installer verification..."
+    wait_for_partition "$(part_path "$TARGET_DISK" "$esp_num")"
+    wait_for_partition "$(part_path "$TARGET_DISK" "$efi_a_num")"
+    wait_for_partition "$(part_path "$TARGET_DISK" "$efi_b_num")"
+    wait_for_partition "$(part_path "$TARGET_DISK" "$root_a_num")"
+    wait_for_partition "$(part_path "$TARGET_DISK" "$root_b_num")"
+    wait_for_partition "$(part_path "$TARGET_DISK" "$var_a_num")"
+    wait_for_partition "$(part_path "$TARGET_DISK" "$var_b_num")"
+    wait_for_partition "$(part_path "$TARGET_DISK" "$home_num")"
+
+    log "Formatting boot and data partitions"
     mkfs.vfat -F 32 -n esp "$(part_path "$TARGET_DISK" "$esp_num")"
-    mkfs.vfat -F 32 -n efi-A "$(part_path "$TARGET_DISK" "$efi_a_num")"
-    mkfs.vfat -F 32 -n efi-B "$(part_path "$TARGET_DISK" "$efi_b_num")"
-
-    mkfs.ext4 -F -L var-A "$(part_path "$TARGET_DISK" "$var_a_num")"
-    mkfs.ext4 -F -L var-B "$(part_path "$TARGET_DISK" "$var_b_num")"
-
+    mkfs.vfat -n efi "$(part_path "$TARGET_DISK" "$efi_a_num")"
+    mkfs.vfat -n efi "$(part_path "$TARGET_DISK" "$efi_b_num")"
+    mkfs.ext4 -F -L var "$(part_path "$TARGET_DISK" "$var_a_num")"
+    mkfs.ext4 -F -L var "$(part_path "$TARGET_DISK" "$var_b_num")"
     mkfs.ext4 -F -O casefold -T huge -L home "$(part_path "$TARGET_DISK" "$home_num")"
     tune2fs -m 0 "$(part_path "$TARGET_DISK" "$home_num")"
+
+    log "Verifying partition metadata"
+    verify_part "$(part_path "$TARGET_DISK" "$esp_num")" vfat esp
+    verify_part "$(part_path "$TARGET_DISK" "$efi_a_num")" vfat efi-A
+    verify_part "$(part_path "$TARGET_DISK" "$efi_b_num")" vfat efi-B
+    verify_part "$(part_path "$TARGET_DISK" "$var_a_num")" ext4 var-A
+    verify_part "$(part_path "$TARGET_DISK" "$var_b_num")" ext4 var-B
+    verify_part "$(part_path "$TARGET_DISK" "$home_num")" ext4 home
+
+    rootdevice=$(findmnt -n -o source /)
+    [[ -n $rootdevice && -e $rootdevice ]] || error "Could not find the recovery environment root device."
+
+    log "Freezing the recovery rootfs before imaging"
+    fsfreeze -f /
+    root_fs_frozen=1
+
+    imageroot "$rootdevice" "$(part_path "$TARGET_DISK" "$root_a_num")"
+    imageroot "$rootdevice" "$(part_path "$TARGET_DISK" "$root_b_num")"
+
+    cleanup
+
+    finalize_part A
+    finalize_part B
+
+    log "Finalizing EFI configuration"
+    steamos-chroot --no-overlay --disk "$TARGET_DISK" --partset A -- steamcl-install --flags restricted --force-extra-removable
 
     echo
     echo "Partition layout after changes:"
     lsblk -o NAME,SIZE,TYPE,FSTYPE,LABEL,PARTLABEL "$TARGET_DISK"
     echo
-
-    echo "Patching $REPAIR_SCRIPT -> $PATCHED_SCRIPT"
-    tmp_patch=$(mktemp)
-    sed \
-        -e "s#^DISK=.*#DISK=$TARGET_DISK#" \
-        -e "s/^FS_ESP=.*/FS_ESP=$esp_num/" \
-        -e "s/^FS_EFI_A=.*/FS_EFI_A=$efi_a_num/" \
-        -e "s/^FS_EFI_B=.*/FS_EFI_B=$efi_b_num/" \
-        -e "s/^FS_ROOT_A=.*/FS_ROOT_A=$root_a_num/" \
-        -e "s/^FS_ROOT_B=.*/FS_ROOT_B=$root_b_num/" \
-        -e "s/^FS_VAR_A=.*/FS_VAR_A=$var_a_num/" \
-        -e "s/^FS_VAR_B=.*/FS_VAR_B=$var_b_num/" \
-        -e "s/^FS_HOME=.*/FS_HOME=$home_num/" \
-        -e 's/^  estat "Finalizing install part $1"$/  sleep 5\n  estat "Finalizing install part $1"/' \
-        -e 's/^  writeHome=1$/  writeHome=1\n  writeOS=1/' \
-        -e 's/^  prompt_reboot "SteamOS reinstall complete."$/  estat "SteamOS reinstall complete. Reboot manually when ready."/' \
-        -e 's/^  prompt_reboot "User partitions have been reformatted."$/  estat "User partitions have been reformatted. Reboot manually when ready."/' \
-        -e '/^all)$/,/^  ;;$/d' \
-        "$REPAIR_SCRIPT" >"$tmp_patch"
-
-    required_assignments=(
-        "DISK=$TARGET_DISK"
-        "FS_ESP=$esp_num"
-        "FS_EFI_A=$efi_a_num"
-        "FS_EFI_B=$efi_b_num"
-        "FS_ROOT_A=$root_a_num"
-        "FS_ROOT_B=$root_b_num"
-        "FS_VAR_A=$var_a_num"
-        "FS_VAR_B=$var_b_num"
-        "FS_HOME=$home_num"
-    )
-
-    for assignment in "${required_assignments[@]}"; do
-        if ! grep -q "^${assignment}\$" "$tmp_patch"; then
-            rm -f "$tmp_patch"
-            error "Failed to patch repair script; expected '$assignment'."
-        fi
-    done
-
-    if grep -q '^all)$' "$tmp_patch"; then
-        rm -f "$tmp_patch"
-        error "Failed to strip destructive 'all' target from repair script."
-    fi
-
-    mv "$tmp_patch" "$PATCHED_SCRIPT"
-    chmod 777 "$PATCHED_SCRIPT"
-
-    echo "Patched installer saved to $PATCHED_SCRIPT"
-    echo
-
-    local target_mode=home
-    if [[ $STEAMOS_SILENT != 1 ]]; then
-        local confirm_message="About to launch the SteamOS install. Continue?"
-        if ! confirm "$confirm_message"; then
-            echo "SteamOS install skipped at user request."
-            exit 0
-        fi
-    fi
-
-    echo "Running SteamOS installer..."
-    (
-        cd "$TOOLS_DIR"
-        NOPROMPT=1 "$PATCHED_SCRIPT" "$target_mode"
-    )
+    echo "SteamOS install complete. Reboot manually when ready."
 }
 
 main "$@"
