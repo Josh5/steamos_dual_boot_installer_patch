@@ -66,6 +66,7 @@ Do these in Windows before booting SteamOS recovery:
 6. Create a SteamOS recovery USB.
    Use Valve’s instructions: [SteamOS Recovery Instructions](https://help.steampowered.com/en/faqs/view/65B4-2AA3-5F37-4227)
 7. Configure Windows to use UTC for the hardware clock.
+
    Windows and Linux treat the RTC differently by default. If the clock is wrong after booting Linux, SteamOS recovery can fail HTTPS/TLS validation and report a connection problem even though Wi-Fi itself is working.
 
    Reference:
@@ -77,8 +78,8 @@ Do these in Windows before booting SteamOS recovery:
    reg add "HKEY_LOCAL_MACHINE\System\CurrentControlSet\Control\TimeZoneInformation" /v RealTimeIsUniversal /d 1 /t REG_DWORD /f
    ```
 
-   > [!IMPORTANT]
-   > After applying the Windows UTC change, make sure the actual system time is correct before starting recovery. It is worth forcing Windows to resync the clock before rebooting. Change the time manually, then set it back correctly, or otherwise trigger a time resync, and verify the BIOS/system clock is correct before booting SteamOS recovery.
+> [!IMPORTANT]
+> After applying the Windows UTC change, make sure the actual system time is correct before starting recovery. It is worth forcing Windows to resync the clock before rebooting. Change the time manually, then set it back correctly, or otherwise trigger a time resync, and verify the BIOS/system clock is correct before booting SteamOS recovery.
 
 ## GUI Install Flow
 
